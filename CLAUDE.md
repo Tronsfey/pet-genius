@@ -2,7 +2,7 @@
 
 Guidance for AI assistants (and humans) working in this repository.
 
-> **Status: design complete, pre-scaffold.** Repository contains only `CLAUDE.md`, `.gitignore`, `.env.example` — no `package.json`, no `src/` yet. The detailed technical design lives in §5 (types, schemas, FSM, animation runtime, server contract, slicing math, perf budget). The next task is the scaffold pass that turns §3's tree into runnable code. Production hosting and license are the only remaining product decisions.
+> **Status: scaffolded, AI action loop pivot complete.** End-to-end runnable: customization form → `/api/sprite` (gpt-image-1, real or `USE_TEST_PET=1` stub) → PixiJS skeletal rig → autonomous + reactive `/api/action` calls (gpt-4o-mini) drive the pet's animations + optional floating thoughts. **Not a chat tool**: the model picks behavior, not dialogue. Production hosting and license are the only remaining product decisions.
 
 ---
 
@@ -13,8 +13,8 @@ Guidance for AI assistants (and humans) working in this repository.
 Product pillars:
 
 - **Pet spirits / 宠物精灵.** Each user has one or more companion creatures with persistent identity, traits, and state.
-- **Personalization.** The creature's appearance, personality, and behavior should feel uniquely the user's — not a generic NPC.
-- **AI-driven.** Behavior, dialogue, and possibly creature design are powered by an LLM / generative model; the world reacts rather than being scripted.
+- **Customizable identity.** The user fills in a small form (name, palette, vibe, species hint) on first load; that seeds a one-shot AI image generation that becomes the pet's permanent appearance.
+- **AI drives behavior, not chat.** Given the pet's current needs / mood / recent events, the model decides what the pet *does* — which animation clip to play, with what intensity, plus an *optional* one-line pet thought that floats briefly above the canvas. This happens both **autonomously** (on a jittered ~10s tick) and **reactively** (after user actions). The product is a pet you watch, not a chatbot you talk to.
 - **Pixel art aesthetic.** All visual assets are pixel-style. Rendering needs to preserve crisp pixels (no smoothing) at multiple zoom levels.
 - **Web-first.** Runs in a browser. No native app target unless explicitly added later.
 
@@ -84,18 +84,21 @@ pet-genius/
 │   ├── world/            # the only writer of PetState
 │   │   ├── fsm.ts            # MoodState transitions
 │   │   ├── tick.ts           # per-frame needs decay + FSM step
-│   │   └── actions.ts        # dispatch(intent): feed / pet / talk / chat-reply
+│   │   ├── actions.ts        # dispatch(intent): feed / pet / ai-action / record-event
+│   │   └── ai-loop.ts        # jittered /api/action poll + post-user-action poke
 │   ├── ui/               # Solid components
 │   │   ├── App.tsx
+│   │   ├── CreatePet.tsx     # first-load trait form, calls /api/sprite, persists pet
 │   │   ├── PetCanvas.tsx     # mounts the PixiJS canvas
-│   │   └── ChatPanel.tsx
+│   │   ├── StatusBar.tsx     # tiny needs bars (hunger / energy / cleanliness / affection)
+│   │   └── ThoughtBubble.tsx # transient floating one-liner above the pet
 │   ├── main.tsx
 │   └── styles.css
 ├── server/               # Hono on Node 20+ — the ONLY place secrets live
 │   ├── env.ts            # dotenv load + required-var checks
 │   ├── openai.ts         # singleton openai SDK client (uses OPENAI_BASE_URL)
-│   ├── prompts.ts        # systemPrompt(traits), spritePrompt(traits)
-│   ├── chat.ts           # POST /api/chat → openai.chat.completions
+│   ├── prompts.ts        # systemPromptForAction(traits), spritePromptForGeneration(traits)
+│   ├── action.ts         # POST /api/action → openai.chat.completions (JSON mode)
 │   ├── sprite.ts         # POST /api/sprite → openai.images.generate
 │   ├── slice.ts          # sharp-based grid slicing
 │   └── index.ts          # entrypoint; serves /api/* + Vite dist/* in prod
@@ -230,8 +233,15 @@ export interface Needs {
   affection: number;    // 0..1, 0 = lonely, 1 = loved
 }
 
+export type PetEventKind = 'fed' | 'petted' | 'ai-action' | 'mood-change';
+export interface PetEvent {
+  kind: PetEventKind;
+  detail?: string;       // e.g. animation name for 'ai-action'
+  at: number;            // unix ms
+}
+
 export interface PetState {
-  version: 1;
+  version: 2;
   id: string;                     // uuid
   createdAt: number;              // unix ms
   traits: PetTraits;
@@ -239,16 +249,21 @@ export interface PetState {
   sprites: Record<string, string>; // spriteId → data URL
   needs: Needs;
   mood: MoodState;
-  // transient — replayable from chat history; persisted for convenience:
-  chatLog: { role: 'user' | 'pet'; text: string; at: number }[];
+  // recent events ring (capped at 6) used as context for /api/action.
+  events: PetEvent[];
 }
+
+// AI action wire shapes
+export interface PetSnapshot { needs: Needs; mood: MoodState; secondsIdle: number }
+export interface ActionRequest { traits: PetTraits; snapshot: PetSnapshot; recent: PetEvent[] }
+export interface ActionResponse { animation: ClipName; intensity: number; thought?: string }
 ```
 
 ### 5.4 Validation schemas
 
 zod schemas in `src/lib/schemas.ts` mirror every type above 1:1. They are the **single source of truth at every untrusted boundary**:
 
-- AI replies (`/api/chat` response, `/api/sprite` response, `animationHint`)
+- AI replies (`/api/action` response, `/api/sprite` response)
 - `localStorage` reads (post-migration)
 - HTTP request bodies arriving at the Hono server
 
@@ -267,8 +282,8 @@ Transitions:
               pet               │ done
    (any) ─────────────────► reacting ─────────────► idle
                                 ▲
-                                │ animationHint
-   (chat reply) ────────────────┘
+                                │ ActionResponse.animation
+   (ai-loop tick / poke) ───────┘
 
          energy < 0.1                    energy > 0.9
    idle ─────────────────► sleeping ──────────────► idle
@@ -278,8 +293,8 @@ Transitions:
 ```
 
 Trigger sources, in priority order:
-1. **User intents** (`feed`, `pet`, `talk`) — highest; preempt non-locked clips.
-2. **AI `animationHint`** from chat — only enters `reacting` for the duration of the hinted clip.
+1. **User intents** (`feed`, `pet`) — highest; preempt non-locked clips. They run the local clip immediately *and* poke the AI loop.
+2. **AI action** from `/api/action` — autonomous (jittered ~10s tick) or reactive (poke shortly after a user intent). Enters `reacting` for the clip's duration.
 3. **World tick** — drives `sleeping`, `sad`, idle-time `playing` based on `needs`.
 4. **Default** — `idle` clip looped.
 
@@ -312,21 +327,21 @@ This is the GSAP-style state-machine-driven pattern from Claude Code's mascot �
 ### 5.7 Pet creation flow
 
 ```
-[UI form: name + palette + vibe + species]
-        │
+[CreatePet form: name + palette + vibe + species]   ◄── shown on first load only
+        │  Summon
         ▼
 client: generateSprite(traits)
         │  POST /api/sprite { traits }
         ▼
 server: openai.images.generate({
           model: 'gpt-image-1',
-          size: '1024x512',
+          size: '1024x1024',
           background: 'transparent',
           prompt: <controlled-layout grid prompt seeded by traits>
         })
         │
         ▼
-server: slice 4×2 grid → 8 PNGs
+server: slice 4×2 grid → up to 8 PNGs
         alpha-trim each, derive bbox + pivot (center of mass)
         drop cells with < 5% non-transparent pixels
         │
@@ -335,45 +350,53 @@ server: respond { sprites: Record<spriteId, dataUrl>, rig: Rig }
         │
         ▼
 client: zod validate
-        build PetState v1 (version, id=uuid, createdAt, traits, rig, sprites, needs={0.5,0.5,0.5,0.5}, mood='idle', chatLog=[])
+        build PetState v2 (version, id=uuid, createdAt, traits, rig, sprites, needs={0.5,0.5,0.5,0.5}, mood='idle', events=[])
         petStore.save(id, state)
         │
         ▼
-render: mountRig(stage, rig, sprites); play 'idle'
+render: mountRig(stage, rig, sprites); play 'idle'; ai-loop starts
 ```
 
-### 5.8 Chat flow
+### 5.8 Action flow (model-driven behavior)
 
+The pet has no chat surface. The model is invoked for behavior, not dialogue. Two trigger modes share the same endpoint:
+
+**Autonomous tick** — every `8–12s` (jittered) `world/ai-loop.ts` snapshots the pet:
 ```
-[user types in ChatPanel] ── intent: 'talk', text ──► world.dispatch
-                                                          │
-                                                          ▼ append to chatLog (user)
-client: chat(messages, traits) ── POST /api/chat ──► server
-                                                          │
-server: openai.chat.completions.create({                 │
-  model: env.CHAT_MODEL,  // default gpt-4o-mini         │
-  messages: [systemPrompt(traits), ...messages],         │
-  response_format: { type: 'json_object' },              │
-})                                                        │
-                                                          ▼
-server: zod validate { reply: string, animationHint?: { name: ClipName, intensity: 0..1 } }
-        respond
-                                                          │
-client: zod re-validate
-                                                          ▼
-        world.dispatch({ kind: 'chat-reply', reply, animationHint })
-        │     ── append to chatLog (pet)
-        │     ── if animationHint, FSM enters 'reacting' with hinted clip
-        ▼
-ui: render reply bubble; render swaps clip
+{ traits, snapshot: { needs, mood, secondsIdle }, recent: PetEvent[] (last 6) }
+   │
+   ▼  POST /api/action
+server: openai.chat.completions.create({
+          model: env.CHAT_MODEL,  // default gpt-4o-mini
+          messages: [
+            systemPromptForAction(traits),
+            { role: 'user', content: userPromptForAction(snapshot, recent) },
+          ],
+          response_format: { type: 'json_object' },
+        })
+   │
+   ▼  zod validate
+{ animation: ClipName, intensity: 0..1, thought?: string }
+   │
+   ▼
+world.dispatch({ kind: 'ai-action', animation, intensity, thought })
+   │
+   ├── FSM transitions to 'reacting' for the clip's duration
+   └── if `thought`, ThoughtBubble shows it for ~3s, then it's gone (never persisted)
 ```
 
-`systemPrompt(traits)` lives in `server/prompts.ts`. It pins JSON output, gives the pet its personality from `traits`, and lists valid `ClipName` values so the model knows the action vocabulary.
+**Reactive poke** — the user clicks `feed` or `pet`:
+1. UI dispatches the *local* intent immediately. The expected clip (`eating`, `happy_bounce`) starts on the next frame; needs adjust; a `PetEvent` is appended to `state.events` (capped at 6).
+2. `ai-loop.pokeAfterUserAction(eventKind)` schedules a single `/api/action` call ~600ms later with the user event in `recent`. The model's response shapes what the pet does *after* the local clip finishes.
+
+**Latency policy:** user actions never block on the model. The reactive poke is fire-and-forget; failures are silent.
+
+**`systemPromptForAction(traits)` lives in `server/prompts.ts`.** It pins JSON output, defines the pet's personality from `traits`, lists valid `ClipName` values, and instructs the model to keep `thought` (if present) to a single short phrase in the user's likely language.
 
 ### 5.9 Sprite slicing math
 
-- `gpt-image-1` returns 1024×512 PNG (chosen for 2:1 aspect; 4 cols × 2 rows).
-- Cell size: 256 × 256.
+- `gpt-image-1` returns a 1024×1024 PNG (the model's only supported sizes are 1024×1024 / 1024×1536 / 1536×1024 / 'auto'). The prompt asks for a 4-column × 2-row layout, so cells are 256w × 512h with the body part centered with vertical padding.
+- Cell size used by the slicer: 256 × 512.
 - Cell → bone mapping (fixed; baked into the prompt):
 
   | col | row 0       | row 1     |
@@ -395,11 +418,11 @@ If quality is bad in practice, swap step 1–4 for SAM2 behind the same `slice(p
 
 ### 5.10 Server contract (Hono)
 
-| Method | Path          | Body                                | 200 response                                   |
-| ------ | ------------- | ----------------------------------- | ---------------------------------------------- |
-| POST   | `/api/chat`   | `{ messages: ChatMessage[], traits }` | `{ reply: string, animationHint?: AnimationHint }` |
-| POST   | `/api/sprite` | `{ traits }`                        | `{ sprites: Record<string, string>, rig: Rig }`  |
-| GET    | `/healthz`    | —                                   | `{ ok: true }`                                 |
+| Method | Path          | Body                                                                       | 200 response                                                       |
+| ------ | ------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| POST   | `/api/action` | `{ traits, snapshot: { needs, mood, secondsIdle }, recent: PetEvent[] }`   | `{ animation: ClipName, intensity: number, thought?: string }`     |
+| POST   | `/api/sprite` | `{ traits }`                                                               | `{ sprites: Record<string, string>, rig: Rig }`                    |
+| GET    | `/healthz`    | —                                                                          | `{ ok: true }`                                                     |
 
 Cross-cutting:
 - **Input validation:** zod parse on entry; reject `400` with `{ error: { code: 'BadRequest', message } }` on failure.
@@ -429,10 +452,13 @@ export interface PetStore {
 
 `migrations.ts`:
 ```ts
-export const CURRENT_VERSION = 1;
+export const CURRENT_VERSION = 2;
 export const migrations: Record<number, (s: any) => any> = {
-  // version 1 is the floor; no migration in
-  // 1: (v0) => ({ ...v0, version: 1, /* fill new fields */ }),
+  // 1 → 2: chat surface removed; chatLog dropped, events ring added.
+  2: (v1) => {
+    const { chatLog: _drop, ...rest } = v1;
+    return { ...rest, version: 2, events: [] };
+  },
 };
 ```
 
@@ -507,7 +533,7 @@ Lightweight pointers — the global Claude Code system prompt already covers the
 
 ## 8. Open questions for future contributors
 
-**Status:** detailed design complete (see §5). Next task = Phase B scaffold per the approved plan: `package.json` / Vite / Hono / first runnable hello-pet end-to-end. Coding starts after user re-confirms.
+**Status:** scaffold + AI-driven action loop shipped. The product is **not** a chat tool: the model decides what the pet *does* (animations + optional one-line floating thoughts), never what it *says* in a transcript. Do not reintroduce a chat surface without explicit user direction.
 
 Fill the boxes in as decisions are made; until then, an AI assistant should ask the user rather than guess.
 
@@ -528,7 +554,8 @@ Fill the boxes in as decisions are made; until then, an AI assistant should ask 
 - [x] Image model: **`gpt-image-1`**
 - [x] Sprite slicing: controlled-layout grid prompt + arithmetic slice on server (SAM2 as upgrade)
 - [x] Skeletal runtime: **custom rig** on PixiJS Containers + JSON keyframes
-- [x] AI key handling: self-hosted Node proxy at `/api/chat` + `/api/sprite`; never in client JS
+- [x] AI key handling: self-hosted Node proxy at `/api/action` + `/api/sprite`; never in client JS
+- [x] AI surface shape: **action-only** (the model picks animations + optional one-line thoughts); **no chat panel, no transcript**
 - [x] Secrets: `.env.local` only; gitignored; never committed; never echoed
 - [x] Persistence: `PetStore` interface, first impl `LocalStoragePetStore`
 - [x] Schema versioning: `PetState.version: number` + sequential migrations in `src/pet/migrations.ts`
