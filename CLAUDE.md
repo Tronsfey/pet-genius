@@ -2,7 +2,7 @@
 
 Guidance for AI assistants (and humans) working in this repository.
 
-> **Status: pre-scaffold.** Repository contains only this file — no `package.json`, no `src/`, no tests yet. **Stack is decided** (see §2): TypeScript, PixiJS v8, Solid, Vite, Vitest, Biome, pnpm, OpenAI-compatible AI client through a `/api/chat` proxy, `PetStore` interface backed by `localStorage`. Until the scaffold lands, the workflow commands in §4 won't run, but they are the contract for the scaffolding pass.
+> **Status: pre-scaffold.** Repository contains only this file — no `package.json`, no `src/`, no tests yet. **Stack is decided** (see §2): TypeScript, PixiJS v8 + Solid + Vite + Vitest + Biome + pnpm; AI via OpenAI through a self-hosted Node proxy at `/api/chat` + `/api/sprite`; sprites are AI-generated per user with skeletal animation; persistence is `localStorage` behind a `PetStore` interface. Until the scaffold lands, the workflow commands in §4 won't run, but they are the contract for the scaffolding pass.
 
 ---
 
@@ -38,11 +38,14 @@ No source files yet — only this file. The stack is decided; scaffolding (`pack
 | Lint + format    | **Biome** (single tool, no ESLint/Prettier)             |
 | Package manager  | **pnpm**                                                |
 | Validation       | **zod** — for AI responses and persisted state          |
-| AI client        | `openai` SDK with custom `baseURL` (OpenAI-compatible)  |
-| AI transport     | Server proxy at `/api/chat`; key never in client JS     |
+| AI client        | `openai` SDK; protocol is OpenAI-compatible             |
+| AI provider      | **OpenAI** (upstream); `baseURL` configurable           |
+| AI transport     | **Self-hosted Node** server proxy at `/api/chat`        |
+| Sprite pipeline  | **AI-generated per user**, then rigged for skeletal animation |
+| Animation        | Skeletal (bone-based); behavior LLM picks clips + parameters |
 | Persistence      | `PetStore` interface; first impl `LocalStoragePetStore` |
 
-**Still open** (ask the user before guessing): deployment target, where the `/api/chat` proxy runs (Cloudflare Worker / edge function / Node), sprite pipeline (hand-drawn / Aseprite / AI-generated), env-var layout, telemetry, license.
+**Still open** (ask the user before guessing): Node server framework (Hono / Fastify / Express / native `http`), specific OpenAI image model (`gpt-image-1` / DALL-E 3), skeletal-animation runtime (Spine via `@esotericsoftware/spine-pixi-v8` / DragonBones / custom rig), how AI-generated sprites are sliced into riggable parts (controlled-layout prompt / SAM / layered generation), where the production server runs, telemetry, license.
 
 When the scaffold lands, **rewrite this file** against the real tree rather than extending placeholders.
 
@@ -66,20 +69,22 @@ pet-genius/
 │   ├── world/          # scenes, interactions, ticker loop (drives PetState updates)
 │   ├── ui/             # Solid components: menus, dialog overlays, settings
 │   └── lib/            # shared utilities, types
-├── server/
-│   └── chat.ts         # /api/chat proxy — holds the LLM key, forwards to upstream
+├── server/             # self-hosted Node — the ONLY place secrets live
+│   ├── index.ts        # entrypoint
+│   ├── chat.ts         # /api/chat — proxies to OpenAI chat.completions
+│   └── sprite.ts       # /api/sprite — proxies to OpenAI image generation
 ├── public/
-│   └── sprites/        # source pixel-art PNGs (no smoothing)
+│   └── sprites/        # static / built-in pixel-art PNGs (no smoothing)
 ├── tests/
 └── scripts/
 ```
 
 Per-directory notes:
 
-- **`src/render/`** — set PixiJS `TextureSource.defaultOptions.scaleMode = 'nearest'` once at boot. Camera zoom must be integer; never CSS-scale the canvas with `image-rendering: auto`.
-- **`src/ai/`** — exposes a single `chat()` that POSTs to `/api/chat`. **Never** imports an API key. AI replies are parsed with zod before they touch state.
+- **`src/render/`** — set PixiJS `TextureSource.defaultOptions.scaleMode = 'nearest'` once at boot. Camera zoom must be integer; never CSS-scale the canvas with `image-rendering: auto`. Skeletal animation runtime lives here too (e.g. `@esotericsoftware/spine-pixi-v8` if Spine is chosen).
+- **`src/ai/`** — exposes `chat()` and `generateSprite()` that POST to `/api/chat` and `/api/sprite`. **Never** imports an API key. AI replies are parsed with zod before they touch state.
 - **`src/pet/`** — call sites depend on the `PetStore` *interface*, not on `localStorage` directly. Swapping to a server backend = a new impl of the same interface.
-- **`server/`** — the only place an LLM API key is allowed to exist. Reads from `process.env`; rejects anything not from a trusted origin.
+- **`server/`** — the only place an LLM API key is allowed to exist. Reads from `process.env.OPENAI_API_KEY` and `process.env.OPENAI_BASE_URL`; rejects anything not from a trusted origin. In dev, Vite's `server.proxy` forwards `/api/*` to the Node server.
 
 ---
 
@@ -129,9 +134,25 @@ AI patch ──► validate (zod) ──► apply ──► PetState ──► P
 - Source PNGs are exported at 1× and upscaled in the renderer.
 
 **AI boundary.**
-- Use the `openai` npm SDK with a configured `baseURL` so the same code talks to any OpenAI-compatible endpoint (Claude via gateway, DeepSeek, Ollama, 智谱, …).
-- The client bundle **must not** contain an API key. All calls go to a same-origin `/api/chat` proxy that injects the key server-side.
-- Every AI reply that affects state is parsed with a zod schema. Reject malformed; do not "best-effort" patch.
+- Use the `openai` npm SDK on the Node server with `OPENAI_API_KEY` + `OPENAI_BASE_URL` from `process.env`.
+- The client bundle **must not** contain an API key. All calls go to same-origin `/api/chat` and `/api/sprite` proxies that inject the key server-side.
+- Every AI reply that affects state (chat replies, generated sprite metadata, animation commands) is parsed with a zod schema. Reject malformed; do not "best-effort" patch.
+
+**Secrets handling — hard rule.**
+- API keys and `baseURL` overrides live **only** in `.env.local` (gitignored). Never in tracked files. Never in commit messages. Never in logs.
+- `.gitignore` must list `.env`, `.env.local`, `.env.*.local`. `.env.example` is the only env file that may be committed, and it contains placeholder values only.
+- When the user shares a key in chat for testing, it is for `.env.local` only. Do not echo it back, do not paste it into any other file, do not include it in a commit. If a key ends up staged by mistake, rotate it.
+- AI assistants: if you ever generate code that reads a key, it reads from `process.env.OPENAI_API_KEY`. No hardcoded fallbacks "for convenience."
+
+**Sprite & animation pipeline.**
+Each pet is visually unique and AI-generated. The pipeline:
+
+1. **Generate.** On pet creation, server hits OpenAI image generation (model TBD — likely `gpt-image-1`) with a prompt seeded from the pet's traits. Output is a pixel-art PNG.
+2. **Slice into rig parts.** The generated sprite is decomposed into bones (head / torso / limbs / tail). Approach not yet chosen — options: a controlled-layout prompt that puts each part in a known cell of the canvas, SAM-based segmentation, or layered/iterative generation. Result is one PNG per bone plus a rig descriptor (bone tree, attachment points).
+3. **Persist.** Sprite assets + rig descriptor are stored as part of `PetState`. They are part of the pet's identity — do not regenerate on every load.
+4. **Animate at runtime.** The skeletal runtime (Spine / DragonBones / custom — TBD) plays clips. The behavior LLM does *not* output bone-level keyframes; it outputs a high-level command like `{ animation: "happy_bounce", intensity: 0.7 }`, which is zod-validated and dispatched to the runtime.
+
+This split keeps the LLM out of the per-frame hot loop: generation is rare and cached; animation playback is deterministic on the client.
 
 **Persistence boundary.**
 - All call sites depend on the `PetStore` interface:
@@ -189,19 +210,25 @@ Fill these in as decisions are made; until then, an AI assistant should ask the 
 - [x] Bundler / dev server: **Vite**
 - [x] Rendering: **PixiJS v8** (WebGL)
 - [x] Package manager: **pnpm**
-- [x] AI protocol: **OpenAI-compatible** via the `openai` SDK with custom `baseURL`
-- [x] AI key handling: server-side proxy at `/api/chat`; never in client JS
+- [x] AI protocol: **OpenAI-compatible** via the `openai` SDK
+- [x] AI provider: **OpenAI** (upstream); `baseURL` configurable via env
+- [x] AI key handling: **self-hosted Node** proxy at `/api/chat` + `/api/sprite`; never in client JS
+- [x] Secrets: `.env.local` only; gitignored; never committed; never echoed
 - [x] Persistence: **`PetStore` interface**, first impl `LocalStoragePetStore`
+- [x] Sprite source: **AI-generated, unique per user**, persisted with the pet
+- [x] Animation: **skeletal**; LLM picks clips + parameters, not per-frame keyframes
 - [x] Test runner: **Vitest**
 - [x] Lint + format: **Biome**
 
 **Still open** — ask the user before guessing:
 
-- [ ] Specific AI provider (DeepSeek / OpenAI / 智谱 / Claude-via-gateway / Ollama / …) and which model
-- [ ] Where the `/api/chat` proxy runs (Cloudflare Worker / Vercel edge / Node server / …)
-- [ ] Deployment target for the static client (Cloudflare Pages / Vercel / Netlify / …)
-- [ ] Sprite pipeline (hand-drawn PNGs / Aseprite source files / AI-generated)
+- [ ] Node server framework (Hono / Fastify / Express / native `http`)
+- [ ] OpenAI image model (`gpt-image-1` / DALL-E 3) and prompt template for pixel-style output
+- [ ] Skeletal-animation runtime (Spine via `@esotericsoftware/spine-pixi-v8` / DragonBones / custom rig)
+- [ ] How to slice a generated sprite into rig parts (controlled-layout prompt / SAM / layered generation)
+- [ ] OpenAI chat model for behavior/dialogue (`gpt-4o-mini` / `gpt-4.1` / …)
+- [ ] Production hosting for the Node server
+- [ ] Deployment target for the static client
 - [ ] `PetState` schema versioning convention
-- [ ] Env-var layout (`.env`, `.env.local`, secret vs. public prefix)
 - [ ] Telemetry / analytics policy
 - [ ] License
