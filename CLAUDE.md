@@ -2,7 +2,7 @@
 
 Guidance for AI assistants (and humans) working in this repository.
 
-> **Status: pre-scaffold.** Repository contains only this file — no `package.json`, no `src/`, no tests yet. **Stack is decided** (see §2): TypeScript, PixiJS v8 + Solid + Vite + Vitest + Biome + pnpm; AI via OpenAI through a self-hosted Node proxy at `/api/chat` + `/api/sprite`; sprites are AI-generated per user with skeletal animation; persistence is `localStorage` behind a `PetStore` interface. Until the scaffold lands, the workflow commands in §4 won't run, but they are the contract for the scaffolding pass.
+> **Status: pre-scaffold.** Repository contains only `CLAUDE.md`, `.gitignore`, `.env.example` — no `package.json`, no `src/`, no tests yet. **Stack is fully chosen** (see §2): TS + PixiJS v8 + Solid + Vite + Vitest + Biome + pnpm in a single package; Hono on Node 20+ for `/api/chat` + `/api/sprite` against OpenAI (`gpt-4o-mini` chat, `gpt-image-1` image); per-user AI-generated sprites driven by a custom skeletal rig; `localStorage` behind a `PetStore` interface with versioned `PetState` migrations. Production hosting and license are the only remaining open decisions.
 
 ---
 
@@ -40,12 +40,18 @@ No source files yet — only this file. The stack is decided; scaffolding (`pack
 | Validation       | **zod** — for AI responses and persisted state          |
 | AI client        | `openai` SDK; protocol is OpenAI-compatible             |
 | AI provider      | **OpenAI** (upstream); `baseURL` configurable           |
-| AI transport     | **Self-hosted Node** server proxy at `/api/chat`        |
-| Sprite pipeline  | **AI-generated per user**, then rigged for skeletal animation |
-| Animation        | Skeletal (bone-based); behavior LLM picks clips + parameters |
+| Chat model       | **`gpt-4o-mini`** (env-overridable)                     |
+| Image model      | **`gpt-image-1`** (transparent-bg pixel sprites)        |
+| Server framework | **Hono** on Node 20+                                    |
+| AI transport     | Self-hosted Node proxy at `/api/chat` + `/api/sprite`   |
+| Static hosting   | Node server also serves Vite `dist/` (one process)      |
+| Sprite pipeline  | AI-generated per user via controlled-layout prompt + grid slice |
+| Animation        | **Custom skeletal rig** on PixiJS Containers; JSON keyframes |
 | Persistence      | `PetStore` interface; first impl `LocalStoragePetStore` |
+| Schema versioning| `PetState.version: number` + sequential migration fns   |
+| Package layout   | Single `package.json` (client + server in one tree)     |
 
-**Still open** (ask the user before guessing): Node server framework (Hono / Fastify / Express / native `http`), specific OpenAI image model (`gpt-image-1` / DALL-E 3), skeletal-animation runtime (Spine via `@esotericsoftware/spine-pixi-v8` / DragonBones / custom rig), how AI-generated sprites are sliced into riggable parts (controlled-layout prompt / SAM / layered generation), where the production server runs, telemetry, license.
+**Still open** (ask the user before guessing): production hosting for the Node server (Fly.io recommended; any VPS works), license, telemetry policy. SAM-based segmentation is an upgrade path if the controlled-layout grid produces low-quality slices in practice.
 
 When the scaffold lands, **rewrite this file** against the real tree rather than extending placeholders.
 
@@ -58,33 +64,32 @@ pet-genius/
 └── CLAUDE.md           # this file
 ```
 
-Target shape once the scaffold lands:
+Target shape once the scaffold lands (single package, no workspaces):
 
 ```
 pet-genius/
-├── src/
-│   ├── pet/            # PetState type + PetStore interface + LocalStoragePetStore
-│   ├── ai/             # openai SDK client, prompt templates, zod schemas for AI replies
-│   ├── render/         # PixiJS app, sprite/animation primitives, integer-scale camera
+├── src/                # browser bundle (Vite entry)
+│   ├── pet/            # PetState type + PetStore interface + LocalStoragePetStore + migrations
+│   ├── ai/             # client-side chat()/generateSprite() that POST to /api/*
+│   ├── render/         # PixiJS app, custom skeletal rig, integer-scale camera
 │   ├── world/          # scenes, interactions, ticker loop (drives PetState updates)
 │   ├── ui/             # Solid components: menus, dialog overlays, settings
-│   └── lib/            # shared utilities, types
-├── server/             # self-hosted Node — the ONLY place secrets live
-│   ├── index.ts        # entrypoint
-│   ├── chat.ts         # /api/chat — proxies to OpenAI chat.completions
-│   └── sprite.ts       # /api/sprite — proxies to OpenAI image generation
-├── public/
-│   └── sprites/        # static / built-in pixel-art PNGs (no smoothing)
+│   └── lib/            # shared types & utilities (used by both src/ and server/)
+├── server/             # Hono on Node — the ONLY place secrets live
+│   ├── index.ts        # entrypoint; serves /api/* + Vite dist/* in prod
+│   ├── chat.ts         # POST /api/chat → openai.chat.completions
+│   └── sprite.ts       # POST /api/sprite → openai.images.generate
+├── public/             # static-shipped assets (favicon, fallback sprites)
 ├── tests/
 └── scripts/
 ```
 
 Per-directory notes:
 
-- **`src/render/`** — set PixiJS `TextureSource.defaultOptions.scaleMode = 'nearest'` once at boot. Camera zoom must be integer; never CSS-scale the canvas with `image-rendering: auto`. Skeletal animation runtime lives here too (e.g. `@esotericsoftware/spine-pixi-v8` if Spine is chosen).
+- **`src/render/`** — set `TextureSource.defaultOptions.scaleMode = 'nearest'` once at boot. Camera zoom is integer-only; do not CSS-scale the canvas. Hosts the custom skeletal rig (see §5).
 - **`src/ai/`** — exposes `chat()` and `generateSprite()` that POST to `/api/chat` and `/api/sprite`. **Never** imports an API key. AI replies are parsed with zod before they touch state.
-- **`src/pet/`** — call sites depend on the `PetStore` *interface*, not on `localStorage` directly. Swapping to a server backend = a new impl of the same interface.
-- **`server/`** — the only place an LLM API key is allowed to exist. Reads from `process.env.OPENAI_API_KEY` and `process.env.OPENAI_BASE_URL`; rejects anything not from a trusted origin. In dev, Vite's `server.proxy` forwards `/api/*` to the Node server.
+- **`src/pet/`** — call sites depend on the `PetStore` *interface*, not on `localStorage` directly. Migrations live here (one fn per version bump).
+- **`server/`** — the only place `OPENAI_API_KEY` and `OPENAI_BASE_URL` are read. Hono router. **Dev:** runs on `:3000`; Vite on `:5173` proxies `/api/*` to it. **Prod:** `pnpm build` produces `dist/`; Hono serves `dist/*` via `serveStatic` and `/api/*` from the same process.
 
 ---
 
@@ -147,12 +152,40 @@ AI patch ──► validate (zod) ──► apply ──► PetState ──► P
 **Sprite & animation pipeline.**
 Each pet is visually unique and AI-generated. The pipeline:
 
-1. **Generate.** On pet creation, server hits OpenAI image generation (model TBD — likely `gpt-image-1`) with a prompt seeded from the pet's traits. Output is a pixel-art PNG.
-2. **Slice into rig parts.** The generated sprite is decomposed into bones (head / torso / limbs / tail). Approach not yet chosen — options: a controlled-layout prompt that puts each part in a known cell of the canvas, SAM-based segmentation, or layered/iterative generation. Result is one PNG per bone plus a rig descriptor (bone tree, attachment points).
-3. **Persist.** Sprite assets + rig descriptor are stored as part of `PetState`. They are part of the pet's identity — do not regenerate on every load.
-4. **Animate at runtime.** The skeletal runtime (Spine / DragonBones / custom — TBD) plays clips. The behavior LLM does *not* output bone-level keyframes; it outputs a high-level command like `{ animation: "happy_bounce", intensity: 0.7 }`, which is zod-validated and dispatched to the runtime.
+1. **Generate.** On pet creation, the server calls `openai.images.generate({ model: 'gpt-image-1', ... })` with a prompt that asks for a **fixed grid layout** (e.g. 4×2 cells, transparent background, one body part per cell labeled head/torso/armL/armR/legL/legR/tail/extra). Prompt is seeded from the pet's traits.
+2. **Slice on the server.** Server slices the returned PNG by grid coordinates, drops empty cells, returns one PNG per bone + a `Rig` descriptor. Slicing is purely arithmetic — no extra ML in the MVP. (If quality is poor in practice, swap in SAM2 segmentation behind the same interface.)
+3. **Persist.** Sliced PNGs (as data-URLs or asset IDs) and the `Rig` descriptor are stored as part of `PetState`. They are the pet's identity — never regenerated on load.
+4. **Animate at runtime.** A custom rig runs entirely in PixiJS:
 
-This split keeps the LLM out of the per-frame hot loop: generation is rare and cached; animation playback is deterministic on the client.
+   ```ts
+   type Bone = {
+     name: string;
+     parent: string | null;
+     pivot: { x: number; y: number };  // local rotation origin
+     spriteId: string;                 // ref to a sliced PNG
+   };
+   type Pose = Record<string, { x?: number; y?: number; rot?: number; scale?: number }>;
+   type AnimationClip = {
+     name: string;                     // "idle", "happy_bounce", "sleep", ...
+     duration: number;                 // seconds
+     loops: boolean;
+     keyframes: { t: number; pose: Pose; ease?: 'linear' | 'easeInOut' }[];
+   };
+   type Rig = { bones: Bone[]; clips: AnimationClip[] };
+   ```
+
+   Each bone is a PixiJS `Container`; sprites are children. The behavior LLM emits `{ animation: "happy_bounce", intensity: number }`, zod-validated. The renderer interpolates between keyframes locally.
+
+This split keeps the LLM out of the per-frame hot loop: generation is rare and cached, the rig is small JSON, and animation playback is deterministic on the client.
+
+**State versioning & migrations.**
+- `PetState` carries a `version: number` field starting at `1`.
+- When the shape changes, bump the number and add a `migrate{N}To{N+1}(old): new` in `src/pet/migrations.ts`.
+- `LocalStoragePetStore.load()` runs migrations in sequence until the version matches the current code. Never silently coerce; throw if a migration is missing.
+
+**Dev vs. prod serving.**
+- **Dev:** Vite at `:5173` (HMR), Hono at `:3000`. `vite.config.ts` sets `server.proxy['/api']` → `http://localhost:3000`. Run them in two terminals or one `concurrently` script.
+- **Prod:** `pnpm build` writes `dist/`. The Hono server serves `dist/*` via `serveStatic` and `/api/*` from the same process. One deploy unit, one URL, no CORS.
 
 **Persistence boundary.**
 - All call sites depend on the `PetStore` interface:
@@ -206,29 +239,29 @@ Fill these in as decisions are made; until then, an AI assistant should ask the 
 - [x] Language: **TypeScript** (`strict: true`)
 - [x] Platform: **web (browser)**
 - [x] Visual style: **pixel art** — `'nearest'` scaling, integer zoom, no anti-aliasing
-- [x] Framework: **Solid**
+- [x] UI framework: **Solid**
 - [x] Bundler / dev server: **Vite**
 - [x] Rendering: **PixiJS v8** (WebGL)
 - [x] Package manager: **pnpm**
+- [x] Package layout: single `package.json` (no workspaces)
+- [x] Server framework: **Hono** on Node 20+
 - [x] AI protocol: **OpenAI-compatible** via the `openai` SDK
-- [x] AI provider: **OpenAI** (upstream); `baseURL` configurable via env
-- [x] AI key handling: **self-hosted Node** proxy at `/api/chat` + `/api/sprite`; never in client JS
+- [x] AI provider: **OpenAI**; `baseURL` configurable via env
+- [x] Chat model: **`gpt-4o-mini`** (env-overridable)
+- [x] Image model: **`gpt-image-1`**
+- [x] Sprite slicing: controlled-layout grid prompt + arithmetic slice on server (SAM2 as upgrade)
+- [x] Skeletal runtime: **custom rig** on PixiJS Containers + JSON keyframes
+- [x] AI key handling: self-hosted Node proxy at `/api/chat` + `/api/sprite`; never in client JS
 - [x] Secrets: `.env.local` only; gitignored; never committed; never echoed
-- [x] Persistence: **`PetStore` interface**, first impl `LocalStoragePetStore`
-- [x] Sprite source: **AI-generated, unique per user**, persisted with the pet
-- [x] Animation: **skeletal**; LLM picks clips + parameters, not per-frame keyframes
+- [x] Persistence: `PetStore` interface, first impl `LocalStoragePetStore`
+- [x] Schema versioning: `PetState.version: number` + sequential migrations in `src/pet/migrations.ts`
+- [x] Dev serving: Vite `:5173` proxies `/api/*` to Hono `:3000`
+- [x] Prod serving: Hono serves `dist/*` + `/api/*` from one process
 - [x] Test runner: **Vitest**
 - [x] Lint + format: **Biome**
+- [x] Telemetry: **none for MVP**
 
 **Still open** — ask the user before guessing:
 
-- [ ] Node server framework (Hono / Fastify / Express / native `http`)
-- [ ] OpenAI image model (`gpt-image-1` / DALL-E 3) and prompt template for pixel-style output
-- [ ] Skeletal-animation runtime (Spine via `@esotericsoftware/spine-pixi-v8` / DragonBones / custom rig)
-- [ ] How to slice a generated sprite into rig parts (controlled-layout prompt / SAM / layered generation)
-- [ ] OpenAI chat model for behavior/dialogue (`gpt-4o-mini` / `gpt-4.1` / …)
-- [ ] Production hosting for the Node server
-- [ ] Deployment target for the static client
-- [ ] `PetState` schema versioning convention
-- [ ] Telemetry / analytics policy
+- [ ] Production hosting for the Node server (Fly.io recommended; any VPS works)
 - [ ] License
