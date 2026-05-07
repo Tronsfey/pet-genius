@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web';
-
-const App = () => <div>pet-genius — scaffold ok</div>;
+import App from './ui/App';
+import './styles.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('#root not found');
