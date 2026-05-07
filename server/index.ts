@@ -1,2 +1,22 @@
-// B1 placeholder. Replaced by the real Hono app in B3.
-console.log('pet-genius server: scaffold placeholder');
+import { existsSync } from 'node:fs';
+import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
+import { Hono } from 'hono';
+import { chatApp } from './chat';
+import { env } from './env';
+import { spriteApp } from './sprite';
+
+const app = new Hono();
+
+app.get('/healthz', (c) => c.json({ ok: true }));
+
+app.route('/api/chat', chatApp);
+app.route('/api/sprite', spriteApp);
+
+if (existsSync('dist')) {
+  app.use('/*', serveStatic({ root: './dist' }));
+}
+
+serve({ fetch: app.fetch, port: env.PORT }, (info) => {
+  console.log(`pet-genius server listening on http://localhost:${info.port}`);
+});

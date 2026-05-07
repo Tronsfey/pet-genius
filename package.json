@@ -7,8 +7,8 @@
   },
   "scripts": {
     "dev": "concurrently -k -n vite,api -c cyan,magenta \"vite\" \"tsx watch server/index.ts\"",
-    "build": "vite build && tsc -p tsconfig.server.json",
-    "start": "node --enable-source-maps dist-server/index.js",
+    "build": "vite build",
+    "start": "node --import tsx --enable-source-maps server/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
