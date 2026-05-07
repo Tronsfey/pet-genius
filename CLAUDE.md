@@ -2,7 +2,7 @@
 
 Guidance for AI assistants (and humans) working in this repository.
 
-> **Status: scaffold.** As of the first commit on `claude/add-claude-documentation-KfExb`, this repository contains no application code — only git history and this file. The product direction below is fixed; concrete implementation choices (framework, package manager, etc.) are not yet decided. Anything marked `<!-- TODO -->` is **not** yet grounded in real code; do not treat it as authoritative.
+> **Status: pre-scaffold.** Repository contains only this file — no `package.json`, no `src/`, no tests yet. **Stack is decided** (see §2): TypeScript, PixiJS v8, Solid, Vite, Vitest, Biome, pnpm, OpenAI-compatible AI client through a `/api/chat` proxy, `PetStore` interface backed by `localStorage`. Until the scaffold lands, the workflow commands in §4 won't run, but they are the contract for the scaffolding pass.
 
 ---
 
@@ -24,12 +24,27 @@ Product pillars:
 
 ## 2. Repository status
 
-- No source files yet.
-- **Decided:** TypeScript is the primary implementation language. Target platform is the web.
-- **Not yet decided:** framework (React / Solid / Svelte / vanilla), bundler (Vite / Next.js / …), package manager (pnpm / npm / yarn), rendering approach (DOM + CSS / `<canvas>` / WebGL via PixiJS / Phaser / kaboom.js), AI provider (Anthropic Claude API / OpenAI / on-device), state/persistence layer, sprite pipeline.
-- No CI, no tests, no lint config yet.
+No source files yet — only this file. The stack is decided; scaffolding (`package.json`, `tsconfig.json`, `src/`) is still to come.
 
-When real code lands, **rewrite this file** against the actual tree rather than extending the placeholders. Re-running `/init` in Claude Code is a fast way to do that.
+**Stack (decided):**
+
+| Layer            | Choice                                                  |
+| ---------------- | ------------------------------------------------------- |
+| Language         | TypeScript (`strict: true`)                             |
+| Renderer         | **PixiJS v8** — WebGL, `scaleMode: 'nearest'`           |
+| UI framework     | **Solid** — fine-grained reactivity, no VDOM            |
+| Bundler / dev    | **Vite**                                                |
+| Tests            | **Vitest**                                              |
+| Lint + format    | **Biome** (single tool, no ESLint/Prettier)             |
+| Package manager  | **pnpm**                                                |
+| Validation       | **zod** — for AI responses and persisted state          |
+| AI client        | `openai` SDK with custom `baseURL` (OpenAI-compatible)  |
+| AI transport     | Server proxy at `/api/chat`; key never in client JS     |
+| Persistence      | `PetStore` interface; first impl `LocalStoragePetStore` |
+
+**Still open** (ask the user before guessing): deployment target, where the `/api/chat` proxy runs (Cloudflare Worker / edge function / Node), sprite pipeline (hand-drawn / Aseprite / AI-generated), env-var layout, telemetry, license.
+
+When the scaffold lands, **rewrite this file** against the real tree rather than extending placeholders.
 
 ---
 
@@ -40,52 +55,99 @@ pet-genius/
 └── CLAUDE.md           # this file
 ```
 
-A reasonable target shape once scaffolding lands (subject to revision based on framework choice):
+Target shape once the scaffold lands:
 
 ```
 pet-genius/
 ├── src/
-│   ├── pet/            # pet entity: traits, state, persistence
-│   ├── ai/             # LLM client, prompt templates, response parsing
-│   ├── render/         # pixel-art rendering: sprites, animations, scaling
-│   ├── world/          # scenes, interactions, time/tick loop
-│   ├── ui/             # chrome around the world (menus, dialogs, settings)
+│   ├── pet/            # PetState type + PetStore interface + LocalStoragePetStore
+│   ├── ai/             # openai SDK client, prompt templates, zod schemas for AI replies
+│   ├── render/         # PixiJS app, sprite/animation primitives, integer-scale camera
+│   ├── world/          # scenes, interactions, ticker loop (drives PetState updates)
+│   ├── ui/             # Solid components: menus, dialog overlays, settings
 │   └── lib/            # shared utilities, types
+├── server/
+│   └── chat.ts         # /api/chat proxy — holds the LLM key, forwards to upstream
 ├── public/
-│   └── sprites/        # source pixel-art assets (PNG, no smoothing)
+│   └── sprites/        # source pixel-art PNGs (no smoothing)
 ├── tests/
 └── scripts/
 ```
 
-<!-- TODO: replace with the real tree once `src/` exists. Keep `image-rendering: pixelated` (or equivalent) front-of-mind in the render layer — this is core to the product's look. -->
+Per-directory notes:
+
+- **`src/render/`** — set PixiJS `TextureSource.defaultOptions.scaleMode = 'nearest'` once at boot. Camera zoom must be integer; never CSS-scale the canvas with `image-rendering: auto`.
+- **`src/ai/`** — exposes a single `chat()` that POSTs to `/api/chat`. **Never** imports an API key. AI replies are parsed with zod before they touch state.
+- **`src/pet/`** — call sites depend on the `PetStore` *interface*, not on `localStorage` directly. Swapping to a server backend = a new impl of the same interface.
+- **`server/`** — the only place an LLM API key is allowed to exist. Reads from `process.env`; rejects anything not from a trusted origin.
 
 ---
 
 ## 4. Development workflow
 
-All commands below are placeholders — none of them work yet because there is no project file.
+These will work once `package.json` exists. Until then, they are the documented contract for the scaffolding pass.
 
-| Step        | Command                                  |
-| ----------- | ---------------------------------------- |
-| Install     | <!-- TODO: e.g. `pnpm install` -->       |
-| Run dev     | <!-- TODO: e.g. `pnpm dev` -->           |
-| Build       | <!-- TODO: e.g. `pnpm build` -->         |
-| Test        | <!-- TODO: e.g. `pnpm test` -->          |
-| Lint        | <!-- TODO: e.g. `pnpm lint` -->          |
-| Typecheck   | <!-- TODO: e.g. `pnpm typecheck` (TS strict mode expected) --> |
-| Format      | <!-- TODO: e.g. `pnpm format` -->        |
+| Step        | Command                          |
+| ----------- | -------------------------------- |
+| Install     | `pnpm install`                   |
+| Run dev     | `pnpm dev` — Vite + Solid + Pixi |
+| Build       | `pnpm build`                     |
+| Test        | `pnpm test` — Vitest             |
+| Typecheck   | `pnpm typecheck` — `tsc --noEmit` |
+| Lint        | `pnpm lint` — Biome              |
+| Format      | `pnpm format` — Biome (writes)   |
 
-When the stack is chosen, fill the table in and delete this note. AI assistants should run the relevant check (test / lint / typecheck) before claiming a task is done.
+Before claiming a task is done, run **typecheck + test + lint**. UI changes additionally require a manual browser pass (open the dev server, exercise the actual interaction).
 
-**TypeScript baseline expectations** (apply once `tsconfig.json` exists):
+**TypeScript baseline:**
 
 - `strict: true`. No silent `any`s.
-- Treat the LLM boundary as untrusted: parse/validate AI responses (e.g. with `zod`) before they touch game state.
-- Pet state is the source of truth. Renderer reads from it; AI responses propose changes that are validated and then applied.
+- The LLM boundary is untrusted — parse AI replies with zod and reject malformed; never feed raw text into state mutations.
+- Persisted state read from `localStorage` is also untrusted — same zod treatment.
 
 ---
 
-## 5. Branching & commit conventions
+## 5. Architecture conventions
+
+Keep these invariants. They are the reason the stack was chosen.
+
+**State is the source of truth.**
+`PetState` is a plain TS object. The PixiJS render layer reads from it; the world tick mutates it; the AI client *proposes* patches that are zod-validated and only then applied. Renderer never mutates state directly; AI responses never mutate state without validation.
+
+```
+world tick ─────┐
+                ▼
+AI patch ──► validate (zod) ──► apply ──► PetState ──► PixiJS scene
+                                              ▲
+                                              └── PetStore (load/save)
+```
+
+**Pixel rendering rules.**
+- Set `TextureSource.defaultOptions.scaleMode = 'nearest'` once at app boot.
+- Zoom levels are integers (1×, 2×, 3×, …). Never use fractional scale.
+- The canvas's CSS sizing must not blur it; rely on PixiJS for scaling, not the browser.
+- Source PNGs are exported at 1× and upscaled in the renderer.
+
+**AI boundary.**
+- Use the `openai` npm SDK with a configured `baseURL` so the same code talks to any OpenAI-compatible endpoint (Claude via gateway, DeepSeek, Ollama, 智谱, …).
+- The client bundle **must not** contain an API key. All calls go to a same-origin `/api/chat` proxy that injects the key server-side.
+- Every AI reply that affects state is parsed with a zod schema. Reject malformed; do not "best-effort" patch.
+
+**Persistence boundary.**
+- All call sites depend on the `PetStore` interface:
+  ```ts
+  interface PetStore {
+    load(petId: string): Promise<PetState | null>;
+    save(petId: string, state: PetState): Promise<void>;
+    list(): Promise<string[]>;
+  }
+  ```
+- First implementation is `LocalStoragePetStore`. A `RemotePetStore` can drop in later without touching renderer / world / AI code.
+- Migrations: when `PetState` shape changes, add a version field and a migration function in `src/pet/`. Do not silently coerce.
+
+---
+
+## 6. Branching & commit conventions
 
 These are **real** conventions in force right now:
 
@@ -101,7 +163,7 @@ These are **real** conventions in force right now:
 
 ---
 
-## 6. Working with Claude Code in this repo
+## 7. Working with Claude Code in this repo
 
 Lightweight pointers — the global Claude Code system prompt already covers the rest.
 
@@ -114,24 +176,32 @@ Lightweight pointers — the global Claude Code system prompt already covers the
 
 ---
 
-## 7. Open questions for future contributors
+## 8. Open questions for future contributors
 
 Fill these in as decisions are made; until then, an AI assistant should ask the user rather than guess.
 
-- [x] Language: **TypeScript**
+**Decided:**
+
+- [x] Language: **TypeScript** (`strict: true`)
 - [x] Platform: **web (browser)**
-- [x] Visual style: **pixel art** — preserve crisp pixels, integer scaling, no anti-aliasing
-- [ ] Framework (React / Solid / Svelte / Vue / vanilla TS?)
-- [ ] Bundler / dev server (Vite / Next.js / Astro / …)
-- [ ] Rendering approach (DOM + CSS sprites / `<canvas>` 2D / WebGL via PixiJS / Phaser / kaboom.js / custom)
-- [ ] Package manager (pnpm / npm / yarn)
-- [ ] AI provider (Anthropic Claude API / OpenAI / on-device WebLLM) and where the API key lives (server proxy vs. user-supplied)
-- [ ] Pet state persistence (localStorage / IndexedDB / server-side DB)
+- [x] Visual style: **pixel art** — `'nearest'` scaling, integer zoom, no anti-aliasing
+- [x] Framework: **Solid**
+- [x] Bundler / dev server: **Vite**
+- [x] Rendering: **PixiJS v8** (WebGL)
+- [x] Package manager: **pnpm**
+- [x] AI protocol: **OpenAI-compatible** via the `openai` SDK with custom `baseURL`
+- [x] AI key handling: server-side proxy at `/api/chat`; never in client JS
+- [x] Persistence: **`PetStore` interface**, first impl `LocalStoragePetStore`
+- [x] Test runner: **Vitest**
+- [x] Lint + format: **Biome**
+
+**Still open** — ask the user before guessing:
+
+- [ ] Specific AI provider (DeepSeek / OpenAI / 智谱 / Claude-via-gateway / Ollama / …) and which model
+- [ ] Where the `/api/chat` proxy runs (Cloudflare Worker / Vercel edge / Node server / …)
+- [ ] Deployment target for the static client (Cloudflare Pages / Vercel / Netlify / …)
 - [ ] Sprite pipeline (hand-drawn PNGs / Aseprite source files / AI-generated)
-- [ ] Test runner (Vitest / Jest / Playwright for E2E)
-- [ ] Linter and formatter (ESLint + Prettier / Biome)
-- [ ] Deployment target (Vercel / Cloudflare Pages / Netlify / static)
-- [ ] Env-var conventions and `.env` handling
-- [ ] Secrets management — **critical:** never ship an LLM API key in client JS; route through a server function
+- [ ] `PetState` schema versioning convention
+- [ ] Env-var layout (`.env`, `.env.local`, secret vs. public prefix)
 - [ ] Telemetry / analytics policy
 - [ ] License
