@@ -1,0 +1,122 @@
+import { z } from 'zod';
+
+export const BoneNameSchema = z.enum([
+  'head',
+  'torso',
+  'armL',
+  'armR',
+  'legL',
+  'legR',
+  'tail',
+  'accessory',
+]);
+
+export const ClipNameSchema = z.enum([
+  'idle',
+  'happy_bounce',
+  'eating',
+  'sleeping',
+  'playing',
+  'sad',
+  'wake',
+  'stretch',
+]);
+
+export const EasingSchema = z.enum(['linear', 'easeInOut', 'easeOutBack']);
+
+export const PetTraitsSchema = z.object({
+  name: z.string().min(1).max(40),
+  palette: z.string().min(1).max(80),
+  vibe: z.string().min(1).max(120),
+  speciesHint: z.string().min(1).max(80),
+});
+
+const Vec2 = z.object({ x: z.number(), y: z.number() });
+
+export const BoneSchema = z.object({
+  name: BoneNameSchema,
+  parent: BoneNameSchema.nullable(),
+  pivot: Vec2,
+  attach: Vec2,
+  spriteId: z.string().min(1),
+  z: z.number(),
+});
+
+export const PoseSchema = z.record(
+  BoneNameSchema,
+  z.object({
+    x: z.number().optional(),
+    y: z.number().optional(),
+    rot: z.number().optional(),
+    scale: z.number().optional(),
+  }),
+);
+
+export const KeyframeSchema = z.object({
+  t: z.number().min(0).max(1),
+  pose: PoseSchema,
+  ease: EasingSchema.optional(),
+});
+
+export const AnimationClipSchema = z.object({
+  name: ClipNameSchema,
+  duration: z.number().positive(),
+  loops: z.boolean(),
+  keyframes: z.array(KeyframeSchema).min(1),
+});
+
+export const RigSchema = z.object({
+  bones: z.array(BoneSchema).min(1),
+  clips: z.array(AnimationClipSchema).min(1),
+});
+
+export const NeedsSchema = z.object({
+  hunger: z.number().min(0).max(1),
+  energy: z.number().min(0).max(1),
+  cleanliness: z.number().min(0).max(1),
+  affection: z.number().min(0).max(1),
+});
+
+export const MoodStateSchema = z.enum(['idle', 'eating', 'sleeping', 'playing', 'reacting', 'sad']);
+
+export const ChatMessageSchema = z.object({
+  role: z.enum(['user', 'pet']),
+  text: z.string(),
+  at: z.number(),
+});
+
+export const PetStateSchema = z.object({
+  version: z.literal(1),
+  id: z.string().min(1),
+  createdAt: z.number(),
+  traits: PetTraitsSchema,
+  rig: RigSchema,
+  sprites: z.record(z.string(), z.string()),
+  needs: NeedsSchema,
+  mood: MoodStateSchema,
+  chatLog: z.array(ChatMessageSchema),
+});
+
+export const AnimationHintSchema = z.object({
+  name: ClipNameSchema,
+  intensity: z.number().min(0).max(1),
+});
+
+export const ChatReplySchema = z.object({
+  reply: z.string().min(1),
+  animationHint: AnimationHintSchema.optional(),
+});
+
+export const SpriteResponseSchema = z.object({
+  sprites: z.record(z.string(), z.string()),
+  rig: RigSchema,
+});
+
+export const ChatRequestSchema = z.object({
+  messages: z.array(ChatMessageSchema),
+  traits: PetTraitsSchema,
+});
+
+export const SpriteRequestSchema = z.object({
+  traits: PetTraitsSchema,
+});
