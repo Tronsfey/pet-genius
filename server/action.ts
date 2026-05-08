@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
-import { ChatReplySchema, ChatRequestSchema } from '../src/lib/schemas';
+import { ActionRequestSchema, ActionResponseSchema } from '../src/lib/schemas';
 import { env } from './env';
 import { openai } from './openai';
-import { systemPromptForChat } from './prompts';
+import { systemPromptForAction, userPromptForAction } from './prompts';
 
-export const chatApp = new Hono();
+export const actionApp = new Hono();
 
-chatApp.post('/', async (c) => {
+actionApp.post('/', async (c) => {
   let bodyRaw: unknown;
   try {
     bodyRaw = await c.req.json();
@@ -14,26 +14,21 @@ chatApp.post('/', async (c) => {
     return c.json({ error: { code: 'BadRequest', message: 'invalid JSON body' } }, 400);
   }
 
-  const parsed = ChatRequestSchema.safeParse(bodyRaw);
+  const parsed = ActionRequestSchema.safeParse(bodyRaw);
   if (!parsed.success) {
     return c.json({ error: { code: 'BadRequest', message: parsed.error.message } }, 400);
   }
-  const { messages, traits } = parsed.data;
-
-  const upstreamMessages = [
-    { role: 'system' as const, content: systemPromptForChat(traits) },
-    ...messages.map((m) => ({
-      role: (m.role === 'pet' ? 'assistant' : 'user') as 'assistant' | 'user',
-      content: m.text,
-    })),
-  ];
+  const { traits, snapshot, recent } = parsed.data;
 
   const startedAt = Date.now();
   try {
     const completion = await openai.chat.completions.create({
       model: env.CHAT_MODEL,
       response_format: { type: 'json_object' },
-      messages: upstreamMessages,
+      messages: [
+        { role: 'system', content: systemPromptForAction(traits) },
+        { role: 'user', content: userPromptForAction(snapshot, recent) },
+      ],
     });
     const content = completion.choices[0]?.message?.content ?? '';
     let asJson: unknown;
@@ -41,11 +36,11 @@ chatApp.post('/', async (c) => {
       asJson = JSON.parse(content);
     } catch {
       console.warn(
-        `chat upstream returned non-JSON in ${Date.now() - startedAt}ms; first 80 chars: ${content.slice(0, 80)}`,
+        `action upstream returned non-JSON in ${Date.now() - startedAt}ms; first 80 chars: ${content.slice(0, 80)}`,
       );
       return c.json({ error: { code: 'Upstream', message: 'model returned non-JSON' } }, 502);
     }
-    const replyParsed = ChatReplySchema.safeParse(asJson);
+    const replyParsed = ActionResponseSchema.safeParse(asJson);
     if (!replyParsed.success) {
       return c.json(
         { error: { code: 'Upstream', message: 'model reply failed schema validation' } },
@@ -55,7 +50,7 @@ chatApp.post('/', async (c) => {
     return c.json(replyParsed.data);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'unknown';
-    console.error(`chat upstream error in ${Date.now() - startedAt}ms: ${msg}`);
+    console.error(`action upstream error in ${Date.now() - startedAt}ms: ${msg}`);
     return c.json({ error: { code: 'Upstream', message: 'upstream call failed' } }, 502);
   }
 });

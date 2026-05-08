@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
-import { chatApp } from './chat';
+import { actionApp } from './action';
 import { env } from './env';
 import { spriteApp } from './sprite';
 
@@ -10,7 +10,7 @@ const app = new Hono();
 
 app.get('/healthz', (c) => c.json({ ok: true }));
 
-app.route('/api/chat', chatApp);
+app.route('/api/action', actionApp);
 app.route('/api/sprite', spriteApp);
 
 if (existsSync('dist')) {

@@ -67,14 +67,16 @@ export interface Needs {
   affection: number;
 }
 
-export interface ChatMessage {
-  role: 'user' | 'pet';
-  text: string;
+export type PetEventKind = 'fed' | 'petted' | 'ai-action' | 'mood-change';
+
+export interface PetEvent {
+  kind: PetEventKind;
+  detail?: string;
   at: number;
 }
 
 export interface PetState {
-  version: 1;
+  version: 2;
   id: string;
   createdAt: number;
   traits: PetTraits;
@@ -82,17 +84,25 @@ export interface PetState {
   sprites: Record<string, string>;
   needs: Needs;
   mood: MoodState;
-  chatLog: ChatMessage[];
+  events: PetEvent[];
 }
 
-export interface AnimationHint {
-  name: ClipName;
+export interface PetSnapshot {
+  needs: Needs;
+  mood: MoodState;
+  secondsIdle: number;
+}
+
+export interface ActionRequest {
+  traits: PetTraits;
+  snapshot: PetSnapshot;
+  recent: PetEvent[];
+}
+
+export interface ActionResponse {
+  animation: ClipName;
   intensity: number;
-}
-
-export interface ChatReply {
-  reply: string;
-  animationHint?: AnimationHint;
+  thought?: string;
 }
 
 export interface SpriteResponse {

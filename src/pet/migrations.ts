@@ -1,8 +1,15 @@
-export const CURRENT_VERSION = 1 as const;
+export const CURRENT_VERSION = 2 as const;
 
 type Migrator = (s: unknown) => unknown;
 
-export const migrations: Record<number, Migrator> = {};
+export const migrations: Record<number, Migrator> = {
+  // 1 → 2: chat surface removed; chatLog dropped, events ring added.
+  2: (v1: unknown) => {
+    const obj = v1 as Record<string, unknown>;
+    const { chatLog: _drop, ...rest } = obj;
+    return { ...rest, version: 2, events: [] };
+  },
+};
 
 export function runMigrations(raw: unknown): unknown {
   let state = raw;

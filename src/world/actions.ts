@@ -1,11 +1,25 @@
-import type { AnimationHint, PetState, Rig } from '../lib/types';
+import type { ClipName, PetEvent, PetEventKind, PetState, Rig } from '../lib/types';
 import { type FsmState, transition } from './fsm';
+
+const EVENTS_CAP = 6;
 
 export type Intent =
   | { kind: 'feed' }
   | { kind: 'pet' }
-  | { kind: 'talk'; text: string }
-  | { kind: 'chat-reply'; reply: string; animationHint?: AnimationHint };
+  | {
+      kind: 'ai-action';
+      animation: ClipName;
+      intensity: number;
+      thought?: string;
+    };
+
+function pushEvent(state: PetState, kind: PetEventKind, detail: string | undefined, at: number) {
+  const evt: PetEvent = detail !== undefined ? { kind, detail, at } : { kind, at };
+  state.events.push(evt);
+  if (state.events.length > EVENTS_CAP) {
+    state.events.splice(0, state.events.length - EVENTS_CAP);
+  }
+}
 
 export function dispatch(
   intent: Intent,
@@ -18,8 +32,9 @@ export function dispatch(
     case 'feed':
       state.needs.hunger = Math.max(0, state.needs.hunger - 0.4);
       state.needs.affection = Math.min(1, state.needs.affection + 0.05);
+      pushEvent(state, 'fed', undefined, Date.now());
       transition(fsm, rig, { mood: 'eating', clip: 'eating' }, now);
-      // 'eating' loops; auto-return after a short window so feed feels finite
+      // 'eating' loops; auto-return so feed feels finite
       setTimeout(() => {
         if (fsm.mood === 'eating') {
           transition(fsm, rig, { mood: 'idle', clip: 'idle' }, performance.now());
@@ -28,16 +43,12 @@ export function dispatch(
       break;
     case 'pet':
       state.needs.affection = Math.min(1, state.needs.affection + 0.25);
+      pushEvent(state, 'petted', undefined, Date.now());
       transition(fsm, rig, { mood: 'reacting', clip: 'happy_bounce' }, now);
       break;
-    case 'talk':
-      state.chatLog.push({ role: 'user', text: intent.text, at: now });
-      break;
-    case 'chat-reply':
-      state.chatLog.push({ role: 'pet', text: intent.reply, at: now });
-      if (intent.animationHint) {
-        transition(fsm, rig, { mood: 'reacting', clip: intent.animationHint.name }, now);
-      }
+    case 'ai-action':
+      pushEvent(state, 'ai-action', intent.animation, Date.now());
+      transition(fsm, rig, { mood: 'reacting', clip: intent.animation }, now);
       break;
   }
 }

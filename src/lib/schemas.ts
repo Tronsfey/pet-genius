@@ -79,14 +79,16 @@ export const NeedsSchema = z.object({
 
 export const MoodStateSchema = z.enum(['idle', 'eating', 'sleeping', 'playing', 'reacting', 'sad']);
 
-export const ChatMessageSchema = z.object({
-  role: z.enum(['user', 'pet']),
-  text: z.string(),
+export const PetEventKindSchema = z.enum(['fed', 'petted', 'ai-action', 'mood-change']);
+
+export const PetEventSchema = z.object({
+  kind: PetEventKindSchema,
+  detail: z.string().optional(),
   at: z.number(),
 });
 
 export const PetStateSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   id: z.string().min(1),
   createdAt: z.number(),
   traits: PetTraitsSchema,
@@ -94,27 +96,30 @@ export const PetStateSchema = z.object({
   sprites: z.record(z.string(), z.string()),
   needs: NeedsSchema,
   mood: MoodStateSchema,
-  chatLog: z.array(ChatMessageSchema),
+  events: z.array(PetEventSchema),
 });
 
-export const AnimationHintSchema = z.object({
-  name: ClipNameSchema,
+export const PetSnapshotSchema = z.object({
+  needs: NeedsSchema,
+  mood: MoodStateSchema,
+  secondsIdle: z.number().min(0),
+});
+
+export const ActionRequestSchema = z.object({
+  traits: PetTraitsSchema,
+  snapshot: PetSnapshotSchema,
+  recent: z.array(PetEventSchema),
+});
+
+export const ActionResponseSchema = z.object({
+  animation: ClipNameSchema,
   intensity: z.number().min(0).max(1),
-});
-
-export const ChatReplySchema = z.object({
-  reply: z.string().min(1),
-  animationHint: AnimationHintSchema.optional(),
+  thought: z.string().max(80).optional(),
 });
 
 export const SpriteResponseSchema = z.object({
   sprites: z.record(z.string(), z.string()),
   rig: RigSchema,
-});
-
-export const ChatRequestSchema = z.object({
-  messages: z.array(ChatMessageSchema),
-  traits: PetTraitsSchema,
 });
 
 export const SpriteRequestSchema = z.object({
