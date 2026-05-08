@@ -1,3 +1,5 @@
+import type { ArtStyle } from './style';
+
 export type BoneName = 'head' | 'torso' | 'armL' | 'armR' | 'legL' | 'legR' | 'tail' | 'accessory';
 
 export interface PetTraits {
@@ -5,6 +7,7 @@ export interface PetTraits {
   palette: string;
   vibe: string;
   speciesHint: string;
+  style: ArtStyle;
 }
 
 export interface Bone {
@@ -76,7 +79,7 @@ export interface PetEvent {
 }
 
 export interface PetState {
-  version: 2;
+  version: 3;
   id: string;
   createdAt: number;
   traits: PetTraits;
@@ -108,4 +111,7 @@ export interface ActionResponse {
 export interface SpriteResponse {
   sprites: Record<string, string>;
   rig: Rig;
+  // Echoed back so the client persists the canonical traits the server
+  // actually drew with (the test-pet path may force style='pixel' regardless).
+  traits: PetTraits;
 }

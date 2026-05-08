@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const ArtStyleSchema = z.enum(['pixel', 'flat', 'watercolor', 'storybook']);
+
 export const BoneNameSchema = z.enum([
   'head',
   'torso',
@@ -29,6 +31,7 @@ export const PetTraitsSchema = z.object({
   palette: z.string().min(1).max(80),
   vibe: z.string().min(1).max(120),
   speciesHint: z.string().min(1).max(80),
+  style: ArtStyleSchema,
 });
 
 const Vec2 = z.object({ x: z.number(), y: z.number() });
@@ -88,7 +91,7 @@ export const PetEventSchema = z.object({
 });
 
 export const PetStateSchema = z.object({
-  version: z.literal(2),
+  version: z.literal(3),
   id: z.string().min(1),
   createdAt: z.number(),
   traits: PetTraitsSchema,
@@ -120,6 +123,7 @@ export const ActionResponseSchema = z.object({
 export const SpriteResponseSchema = z.object({
   sprites: z.record(z.string(), z.string()),
   rig: RigSchema,
+  traits: PetTraitsSchema,
 });
 
 export const SpriteRequestSchema = z.object({

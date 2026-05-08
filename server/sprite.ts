@@ -13,6 +13,7 @@ export const spriteApp = new Hono();
 interface PetAssets {
   sprites: Record<string, string>;
   rig: Rig;
+  traits: PetTraits;
 }
 
 const cache = new Map<string, PetAssets>();
@@ -44,7 +45,8 @@ async function generateRealPet(traits: PetTraits): Promise<PetAssets> {
   if (!b64) throw new Error('image upstream returned no b64_json');
   const buf = Buffer.from(b64, 'base64');
   console.log(`sprite gen: ${env.IMAGE_MODEL} done in ${Date.now() - startedAt}ms`);
-  return sliceGridImage(buf);
+  const { sprites, rig } = await sliceGridImage(buf, traits.style);
+  return { sprites, rig, traits };
 }
 
 spriteApp.post('/', async (c) => {
@@ -66,15 +68,19 @@ spriteApp.post('/', async (c) => {
   if (cached) return c.json(cached);
 
   // Local-dev escape hatch: skip the upstream when we know it's blocked.
+  // The test pet is hand-drawn pixel art, so the response forces
+  // style='pixel' regardless of what the user requested — the client renders
+  // what it actually got, not what it asked for.
   if (env.USE_TEST_PET) {
-    const testPet = await buildTestPet();
-    cachePut(key, testPet);
-    return c.json(testPet);
+    const { sprites, rig } = await buildTestPet();
+    const echoedTraits: PetTraits = { ...traits, style: 'pixel' };
+    const pet: PetAssets = { sprites, rig, traits: echoedTraits };
+    cachePut(key, pet);
+    return c.json(pet);
   }
 
   try {
     const pet = await generateRealPet(traits);
-    // Pre-validate before caching/returning
     SpriteResponseSchema.parse(pet);
     cachePut(key, pet);
     return c.json(pet);

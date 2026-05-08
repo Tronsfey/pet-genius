@@ -1,4 +1,4 @@
-export const CURRENT_VERSION = 2 as const;
+export const CURRENT_VERSION = 3 as const;
 
 type Migrator = (s: unknown) => unknown;
 
@@ -8,6 +8,17 @@ export const migrations: Record<number, Migrator> = {
     const obj = v1 as Record<string, unknown>;
     const { chatLog: _drop, ...rest } = obj;
     return { ...rest, version: 2, events: [] };
+  },
+  // 2 → 3: art style abstracted; traits.style defaults to 'pixel' (the
+  // historical default) for any pet generated before the multi-style pivot.
+  3: (v2: unknown) => {
+    const obj = v2 as Record<string, unknown>;
+    const traits = (obj.traits as Record<string, unknown>) ?? {};
+    return {
+      ...obj,
+      version: 3,
+      traits: { ...traits, style: 'pixel' },
+    };
   },
 };
 

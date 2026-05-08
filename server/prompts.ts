@@ -1,3 +1,4 @@
+import { STYLES } from '../src/lib/style';
 import type { PetEvent, PetSnapshot, PetTraits } from '../src/lib/types';
 
 const VALID_CLIPS = [
@@ -62,14 +63,15 @@ Decide your next action. Reply ONLY with the JSON object.`;
 }
 
 export function spritePromptForGeneration(traits: PetTraits): string {
-  return `Generate a 1024x1024 pixel-art reference sheet on a transparent background.
+  const style = STYLES[traits.style];
+  return `Generate a 1024x1024 character sprite reference sheet on a transparent background.
 The image is divided into a fixed 4 columns × 2 rows grid (each cell is 256w × 512h), with one body part per cell, drawn in the center of its cell with at least 16px padding from all edges.
 
 Cell layout (column,row):
 (0,0) head    (1,0) torso    (2,0) legL    (3,0) tail
 (0,1) armL    (1,1) armR     (2,1) legR    (3,1) accessory
 
-Subject: a ${traits.speciesHint} with ${traits.palette} coloring, personality "${traits.vibe}". Pixel-art style, retro 16-bit, crisp pixels, no anti-aliasing, no outlines outside the parts, transparent everywhere except inside parts.
+Subject: a ${traits.speciesHint} with ${traits.palette} coloring, personality "${traits.vibe}". ${style.promptStyle}. The background must be fully transparent — no color outside the parts.
 
 Each part must be self-contained (no overlap into adjacent cells). Accessory may be omitted (leave that cell empty if no accessory fits the personality).`;
 }

@@ -1,39 +1,32 @@
 import sharp from 'sharp';
+import { type ArtStyle, STYLES } from '../src/lib/style';
 import type { Bone, BoneName, Rig } from '../src/lib/types';
 import { defaultClips } from './clips';
 
-// Cell layout matching spritePromptForGeneration (4 cols × 2 rows in a 1024×1024 image).
-// gpt-image-1 doesn't accept 1024×512, so cells are 256w × 512h with body part
-// centered with padding above/below.
+// Cell layout matching spritePromptForGeneration. The 4×2 grid covers a
+// 1024×1024 image (gpt-image-1's only supported square size); each cell is
+// 256w × 512h with the body part centered with vertical padding.
 export const CELL_LAYOUT: ReadonlyArray<{
   col: number;
   row: number;
   bone: BoneName;
   parent: BoneName | null;
   z: number;
-  defaultAttach: { x: number; y: number };
 }> = [
-  // Row 0
-  { col: 0, row: 0, bone: 'head', parent: 'torso', z: 3, defaultAttach: { x: 0, y: -10 } },
-  { col: 1, row: 0, bone: 'torso', parent: null, z: 1, defaultAttach: { x: 0, y: 0 } },
-  { col: 2, row: 0, bone: 'legL', parent: 'torso', z: 0, defaultAttach: { x: -8, y: 12 } },
-  { col: 3, row: 0, bone: 'tail', parent: 'torso', z: 0, defaultAttach: { x: -22, y: 4 } },
-  // Row 1
-  { col: 0, row: 1, bone: 'armL', parent: 'torso', z: 2, defaultAttach: { x: -16, y: -4 } },
-  { col: 1, row: 1, bone: 'armR', parent: 'torso', z: 2, defaultAttach: { x: 16, y: -4 } },
-  { col: 2, row: 1, bone: 'legR', parent: 'torso', z: 0, defaultAttach: { x: 8, y: 12 } },
-  { col: 3, row: 1, bone: 'accessory', parent: 'head', z: 4, defaultAttach: { x: 0, y: -8 } },
+  { col: 0, row: 0, bone: 'head', parent: 'torso', z: 3 },
+  { col: 1, row: 0, bone: 'torso', parent: null, z: 1 },
+  { col: 2, row: 0, bone: 'legL', parent: 'torso', z: 0 },
+  { col: 3, row: 0, bone: 'tail', parent: 'torso', z: 0 },
+  { col: 0, row: 1, bone: 'armL', parent: 'torso', z: 2 },
+  { col: 1, row: 1, bone: 'armR', parent: 'torso', z: 2 },
+  { col: 2, row: 1, bone: 'legR', parent: 'torso', z: 0 },
+  { col: 3, row: 1, bone: 'accessory', parent: 'head', z: 4 },
 ];
 
 const GRID_COLS = 4;
 const GRID_ROWS = 2;
-const MIN_NON_TRANSPARENT_RATIO = 0.05;
 
-interface CellResult {
-  bone: BoneName;
-  parent: BoneName | null;
-  z: number;
-  defaultAttach: { x: number; y: number };
+interface TrimmedCell {
   pngBuf: Buffer;
   width: number;
   height: number;
@@ -42,8 +35,8 @@ interface CellResult {
 
 async function trimAndPivot(
   cellPng: Buffer,
-): Promise<(CellResult['pivot'] & { pngBuf: Buffer; width: number; height: number }) | null> {
-  // Alpha trim
+  minNonTransparentRatio: number,
+): Promise<TrimmedCell | null> {
   let trimmed: Buffer;
   let meta: sharp.Metadata;
   try {
@@ -56,7 +49,6 @@ async function trimAndPivot(
   const h = meta.height ?? 0;
   if (w < 4 || h < 4) return null;
 
-  // Density check on trimmed buffer
   const { data, info } = await sharp(trimmed)
     .raw()
     .ensureAlpha()
@@ -75,15 +67,48 @@ async function trimAndPivot(
       }
     }
   }
-  if (nonTransparent / totalPx < MIN_NON_TRANSPARENT_RATIO) return null;
+  if (nonTransparent / totalPx < minNonTransparentRatio) return null;
 
-  const pivotX = Math.round(sumX / nonTransparent);
-  const pivotY = Math.round(sumY / nonTransparent);
-  return { x: pivotX, y: pivotY, pngBuf: trimmed, width: info.width, height: info.height };
+  return {
+    pngBuf: trimmed,
+    width: info.width,
+    height: info.height,
+    pivot: { x: Math.round(sumX / nonTransparent), y: Math.round(sumY / nonTransparent) },
+  };
+}
+
+// Default attach offsets are computed proportionally to the parent's bbox so
+// they scale correctly across art styles (a watercolor torso may be 4× bigger
+// than a pixel one but the same proportions still anchor the limbs).
+function attachFor(bone: BoneName, trimmed: Map<BoneName, TrimmedCell>): { x: number; y: number } {
+  const torso = trimmed.get('torso');
+  const head = trimmed.get('head');
+  const tw = torso?.width ?? 40;
+  const th = torso?.height ?? 28;
+  const hh = head?.height ?? 26;
+  switch (bone) {
+    case 'torso':
+      return { x: 0, y: 0 };
+    case 'head':
+      return { x: 0, y: -th * 0.36 };
+    case 'armL':
+      return { x: -tw * 0.4, y: -th * 0.15 };
+    case 'armR':
+      return { x: tw * 0.4, y: -th * 0.15 };
+    case 'legL':
+      return { x: -tw * 0.2, y: th * 0.45 };
+    case 'legR':
+      return { x: tw * 0.2, y: th * 0.45 };
+    case 'tail':
+      return { x: -tw * 0.55, y: th * 0.1 };
+    case 'accessory':
+      return { x: 0, y: -hh * 0.4 };
+  }
 }
 
 export async function sliceGridImage(
   png: Buffer,
+  style: ArtStyle,
 ): Promise<{ sprites: Record<string, string>; rig: Rig }> {
   const meta = await sharp(png).metadata();
   const totalW = meta.width ?? 0;
@@ -93,10 +118,10 @@ export async function sliceGridImage(
   }
   const cellW = Math.floor(totalW / GRID_COLS);
   const cellH = Math.floor(totalH / GRID_ROWS);
+  const minRatio = STYLES[style].minNonTransparentRatio;
 
-  const bones: Bone[] = [];
-  const sprites: Record<string, string> = {};
-
+  // First pass: trim every cell, collect metadata.
+  const trimmed = new Map<BoneName, TrimmedCell>();
   for (const slot of CELL_LAYOUT) {
     const cellBuf = await sharp(png)
       .extract({
@@ -107,26 +132,29 @@ export async function sliceGridImage(
       })
       .png()
       .toBuffer();
+    const t = await trimAndPivot(cellBuf, minRatio);
+    if (t) trimmed.set(slot.bone, t);
+  }
 
-    const trimmed = await trimAndPivot(cellBuf);
-    if (!trimmed) continue; // empty / sparse cell — drop
+  if (!trimmed.has('torso') || !trimmed.has('head')) {
+    throw new Error('sliceGridImage: missing required head or torso');
+  }
 
-    sprites[slot.bone] = `data:image/png;base64,${trimmed.pngBuf.toString('base64')}`;
+  // Second pass: assemble bones using proportional attach offsets.
+  const bones: Bone[] = [];
+  const sprites: Record<string, string> = {};
+  for (const slot of CELL_LAYOUT) {
+    const t = trimmed.get(slot.bone);
+    if (!t) continue;
+    sprites[slot.bone] = `data:image/png;base64,${t.pngBuf.toString('base64')}`;
     bones.push({
       name: slot.bone,
       parent: slot.parent,
-      pivot: { x: trimmed.x, y: trimmed.y },
-      attach: slot.defaultAttach,
+      pivot: t.pivot,
+      attach: attachFor(slot.bone, trimmed),
       spriteId: slot.bone,
       z: slot.z,
     });
-  }
-
-  // Validate minimum bones
-  const hasTorso = bones.some((b) => b.name === 'torso');
-  const hasHead = bones.some((b) => b.name === 'head');
-  if (!hasTorso || !hasHead) {
-    throw new Error('sliceGridImage: missing required head or torso');
   }
 
   return {

@@ -1,5 +1,6 @@
 import { For, createSignal } from 'solid-js';
 import { generateSprite } from '../ai/client';
+import { type ArtStyle, STYLES } from '../lib/style';
 import type { PetState, PetTraits } from '../lib/types';
 
 interface Props {
@@ -14,6 +15,7 @@ const PRESETS: { label: string; traits: PetTraits }[] = [
       palette: 'warm orange and cream',
       vibe: 'shy bookworm, curious',
       speciesHint: 'small fox cub',
+      style: 'pixel',
     },
   },
   {
@@ -23,6 +25,7 @@ const PRESETS: { label: string; traits: PetTraits }[] = [
       palette: 'mint green with pale belly',
       vibe: 'mischievous troublemaker',
       speciesHint: 'baby dragon',
+      style: 'flat',
     },
   },
   {
@@ -32,9 +35,12 @@ const PRESETS: { label: string; traits: PetTraits }[] = [
       palette: 'soft cloud-white with pink cheeks',
       vibe: 'sleepy and gentle',
       speciesHint: 'round slime cat',
+      style: 'watercolor',
     },
   },
 ];
+
+const STYLE_ORDER: ArtStyle[] = ['pixel', 'flat', 'watercolor', 'storybook'];
 
 function newPetId(): string {
   return crypto.randomUUID();
@@ -45,6 +51,7 @@ export default function CreatePet(props: Props) {
   const [palette, setPalette] = createSignal('warm orange and cream');
   const [vibe, setVibe] = createSignal('shy bookworm, curious');
   const [species, setSpecies] = createSignal('small fox cub');
+  const [style, setStyle] = createSignal<ArtStyle>('pixel');
   const [busy, setBusy] = createSignal(false);
   const [err, setErr] = createSignal<string | null>(null);
 
@@ -53,6 +60,7 @@ export default function CreatePet(props: Props) {
     setPalette(t.palette);
     setVibe(t.vibe);
     setSpecies(t.speciesHint);
+    setStyle(t.style);
   };
 
   const submit = async (e: SubmitEvent) => {
@@ -61,18 +69,19 @@ export default function CreatePet(props: Props) {
     setErr(null);
     setBusy(true);
     try {
-      const traits: PetTraits = {
+      const requested: PetTraits = {
         name: name().trim(),
         palette: palette().trim(),
         vibe: vibe().trim(),
         speciesHint: species().trim(),
+        style: style(),
       };
-      const { sprites, rig } = await generateSprite(traits);
+      const { sprites, rig, traits: actual } = await generateSprite(requested);
       const fresh: PetState = {
-        version: 2,
+        version: 3,
         id: newPetId(),
         createdAt: Date.now(),
-        traits,
+        traits: actual,
         rig,
         sprites,
         needs: { hunger: 0.4, energy: 0.7, cleanliness: 0.7, affection: 0.5 },
@@ -157,6 +166,25 @@ export default function CreatePet(props: Props) {
             required
           />
         </label>
+
+        <div class="field">
+          <span class="field-label">画风</span>
+          <div class="style-picker">
+            <For each={STYLE_ORDER}>
+              {(s) => (
+                <button
+                  type="button"
+                  class="style-chip"
+                  classList={{ active: style() === s }}
+                  onClick={() => setStyle(s)}
+                  disabled={busy()}
+                >
+                  {STYLES[s].label}
+                </button>
+              )}
+            </For>
+          </div>
+        </div>
 
         {err() && <div class="form-err">⚠ {err()}</div>}
 

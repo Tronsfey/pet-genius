@@ -4,9 +4,14 @@ import type { Bone, BoneName, Pose, Rig } from '../lib/types';
 export interface RigInstance {
   root: Container;
   bones: Map<BoneName, { container: Container; bone: Bone }>;
+  clipScaleFactor: number;
 }
 
-export async function mountRig(rig: Rig, sprites: Record<string, string>): Promise<RigInstance> {
+export async function mountRig(
+  rig: Rig,
+  sprites: Record<string, string>,
+  clipScaleFactor = 1,
+): Promise<RigInstance> {
   const containers = new Map<BoneName, { container: Container; bone: Bone }>();
 
   for (const bone of rig.bones) {
@@ -39,10 +44,11 @@ export async function mountRig(rig: Rig, sprites: Record<string, string>): Promi
     }
   }
 
-  return { root, bones: containers };
+  return { root, bones: containers, clipScaleFactor };
 }
 
 export function applyPose(instance: RigInstance, pose: Pose): void {
+  const k = instance.clipScaleFactor;
   for (const [name, entry] of instance.bones) {
     const part = pose[name];
     const baseX = entry.bone.attach.x;
@@ -53,7 +59,7 @@ export function applyPose(instance: RigInstance, pose: Pose): void {
       entry.container.scale.set(1);
       continue;
     }
-    entry.container.position.set(baseX + (part.x ?? 0), baseY + (part.y ?? 0));
+    entry.container.position.set(baseX + (part.x ?? 0) * k, baseY + (part.y ?? 0) * k);
     entry.container.rotation = part.rot ?? 0;
     entry.container.scale.set(part.scale ?? 1);
   }

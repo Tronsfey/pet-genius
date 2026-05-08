@@ -15,7 +15,12 @@ export default function PetCanvas(props: Props) {
   let host!: HTMLDivElement;
 
   onMount(async () => {
-    const pet = await createPetApp(host, props.state.rig, props.state.sprites);
+    const pet = await createPetApp(
+      host,
+      props.state.rig,
+      props.state.sprites,
+      props.state.traits.style,
+    );
     let last = performance.now();
     const ticker = (now: number) => {
       const dtMs = now - last;
