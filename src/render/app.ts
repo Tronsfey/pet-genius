@@ -20,7 +20,7 @@ export async function createPetApp(
 
   const app = new Application();
   await app.init({
-    background: 0x0f1117,
+    backgroundAlpha: 0,
     antialias: false,
     resolution: window.devicePixelRatio || 1,
     autoDensity: true,
@@ -35,7 +35,7 @@ export async function createPetApp(
 
   const center = () => {
     petStage.x = app.screen.width / 2;
-    petStage.y = app.screen.height / 2 + 30;
+    petStage.y = app.screen.height * 0.7;
   };
   center();
   app.renderer.on('resize', center);

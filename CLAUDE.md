@@ -16,6 +16,7 @@ Product pillars:
 - **Customizable identity.** The user fills in a small form (name, palette, vibe, species hint) on first load; that seeds a one-shot AI image generation that becomes the pet's permanent appearance.
 - **AI drives behavior, not chat.** Given the pet's current needs / mood / recent events, the model decides what the pet *does* — which animation clip to play, with what intensity, plus an *optional* one-line pet thought that floats briefly above the canvas. This happens both **autonomously** (on a jittered ~10s tick) and **reactively** (after user actions). The product is a pet you watch, not a chatbot you talk to.
 - **Pixel art aesthetic.** All visual assets are pixel-style. Rendering needs to preserve crisp pixels (no smoothing) at multiple zoom levels.
+- **Lives anywhere on the page.** The pet renders into a transparent PixiJS canvas inside a small floating widget the user can drag to any spot on screen. There is no "stage frame" — only the creature, with a hover-revealed mini panel for status + actions. Position persists across reloads.
 - **Web-first.** Runs in a browser. No native app target unless explicitly added later.
 
 <!-- TODO: link to design doc, product spec, or roadmap once one exists. -->
@@ -115,7 +116,7 @@ pet-genius/
 
 Per-directory notes:
 
-- **`src/render/`** — set `TextureSource.defaultOptions.scaleMode = 'nearest'` once at boot. Camera zoom is integer-only; do not CSS-scale the canvas. Hosts the custom skeletal rig (see §5).
+- **`src/render/`** — set `TextureSource.defaultOptions.scaleMode = 'nearest'` once at boot. PixiJS Application is initialized with `backgroundAlpha: 0` so the canvas is transparent and the pet floats over whatever is behind it. Camera zoom is integer-only; do not CSS-scale the canvas. Hosts the custom skeletal rig (see §5).
 - **`src/ai/`** — exposes `chat()` and `generateSprite()` that POST to `/api/chat` and `/api/sprite`. **Never** imports an API key. AI replies are parsed with zod before they touch state.
 - **`src/pet/`** — call sites depend on the `PetStore` *interface*, not on `localStorage` directly. Migrations live here (one fn per version bump).
 - **`server/`** — the only place `OPENAI_API_KEY` and `OPENAI_BASE_URL` are read. Hono router. **Dev:** runs on `:3000`; Vite on `:5173` proxies `/api/*` to it. **Prod:** `pnpm build` produces `dist/`; Hono serves `dist/*` via `serveStatic` and `/api/*` from the same process.
