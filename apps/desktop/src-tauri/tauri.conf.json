@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "pet-genius",
+  "version": "0.1.0",
+  "identifier": "com.pet-genius.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm --filter @pet-genius/desktop exec vite",
+    "beforeBuildCommand": "pnpm --filter @pet-genius/desktop exec vite build",
+    "devUrl": "http://localhost:5174",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "pet",
+        "title": "pet-genius",
+        "width": 1280,
+        "height": 800,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": false,
+        "fullscreen": false,
+        "resizable": true,
+        "shadow": false,
+        "visible": true,
+        "url": "index.html"
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "trayIcon": {
+      "id": "pet-genius-tray",
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    }
+  },
+  "bundle": {
+    "active": true,
+    "category": "Entertainment",
+    "shortDescription": "AI-driven pixel pet that lives on your desktop.",
+    "longDescription": "Customize a unique pet (name, palette, vibe, art style), then watch it live on your transparent always-on-top desktop overlay. The AI decides what it does, not what it says.",
+    "targets": "all",
+    "icon": ["icons/icon.png"]
+  }
+}

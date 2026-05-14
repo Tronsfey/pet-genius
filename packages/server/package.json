@@ -8,16 +8,34 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "files": ["src"],
+  "files": ["dist", "src"],
   "scripts": {
+    "build": "tsup",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo 'no server tests yet' && exit 0"
+    "test": "echo 'no server tests yet' && exit 0",
+    "prepublishOnly": "pnpm build"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
+  "peerDependencies": {
+    "hono": "^4.0.0"
   },
   "dependencies": {
     "@pet-genius/shared": "workspace:*",
-    "hono": "^4.6.14",
     "openai": "^4.77.0",
     "sharp": "^0.33.5",
     "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "hono": "^4.6.14",
+    "tsup": "^8.3.5"
   }
 }

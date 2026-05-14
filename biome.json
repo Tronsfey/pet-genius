@@ -1,7 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "files": {
-    "ignore": ["dist", "dist-server", "node_modules", "public"]
+    "ignore": [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/target/**",
+      "**/gen/**",
+      "**/public/**",
+      "pnpm-lock.yaml",
+      "scripts/screenshots/**"
+    ]
   },
   "formatter": {
     "enabled": true,

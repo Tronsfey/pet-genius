@@ -2,7 +2,7 @@
 
 Guidance for AI assistants (and humans) working in this repository.
 
-> **Status: monorepo SDK ready.** Three publishable packages — `@pet-genius/shared` (types + zod + style config + clips), `@pet-genius/server` (`createPetGeniusApp` Hono factory), `@pet-genius/widget` (`summonPet` browser SDK) — plus `apps/demo` as the reference consumer. End-to-end runnable: customization form → `/api/sprite` (gpt-image-1, real or `USE_TEST_PET=1` stub) → PixiJS skeletal rig on a transparent draggable widget → autonomous + reactive `/api/action` calls (gpt-4o-mini) drive the pet's animations + optional floating thoughts. **Not a chat tool**: the model picks behavior, not dialogue.
+> **Status: SDK + desktop shipping.** Three publishable npm packages (`@pet-genius/shared` / `server` / `widget`) build cleanly to `dist/` and pass `pnpm publish --dry-run`. Two reference apps: `apps/demo` (web) and `apps/desktop` (Tauri 2, real `.deb` / `.dmg` / `.msi` / `.AppImage` installers). End-to-end runnable: customization form → `/api/sprite` (gpt-image-1, real or `USE_TEST_PET=1` stub) → PixiJS skeletal rig on a transparent draggable widget → autonomous + reactive `/api/action` calls (gpt-4o-mini) drive the pet's animations + optional floating thoughts. **Not a chat tool**: the model picks behavior, not dialogue.
 
 ---
 
@@ -101,10 +101,21 @@ pet-genius/
 │       ├── tests/migrations.test.ts
 │       └── package.json
 ├── apps/
-│   └── demo/                         # consumer of the published SDK
-│       ├── server.ts                 # demo Node server using createPetGeniusApp + dotenv
-│       ├── src/main.tsx              # consumer using summonPet
-│       ├── src/demo.css              # demo page chrome (header / backdrop only)
+│   ├── demo/                         # web consumer of the published SDK
+│   │   ├── server.ts                 # demo Node server using createPetGeniusApp + dotenv
+│   │   ├── src/main.tsx              # consumer using summonPet
+│   │   ├── src/demo.css              # demo page chrome (header / backdrop only)
+│   │   ├── index.html
+│   │   ├── vite.config.ts
+│   │   └── package.json
+│   └── desktop/                      # Tauri 2 wrapper — transparent always-on-top window
+│       ├── src/main.tsx              # mounts summonPet into a fullscreen transparent host
+│       ├── src-tauri/                # Rust + tauri.conf.json + capabilities
+│       │   ├── src/{main.rs,lib.rs}
+│       │   ├── Cargo.toml
+│       │   ├── tauri.conf.json
+│       │   ├── capabilities/default.json
+│       │   └── icons/icon.png
 │       ├── index.html
 │       ├── vite.config.ts
 │       └── package.json
@@ -122,7 +133,8 @@ Per-package notes:
 - **`packages/shared`** — depends only on `zod`. Imported by both widget and server so the wire format between them is defined exactly once. No DOM, no Node-specific APIs; safe to consume from anywhere.
 - **`packages/widget`** — public entry is `summonPet(opts)` returning a `WidgetController`. PixiJS is initialized with `backgroundAlpha: 0` (transparent canvas). `TextureSource.defaultOptions.scaleMode` and `image-rendering` are driven by the chosen `ArtStyle` (`nearest` + `pixelated` for `pixel`; `linear` + `auto` otherwise). The PixiJS Application + AI loop + Solid render are all disposed when `controller.destroy()` is called. **Never** imports an API key — calls go through `ApiClient(apiBase)`.
 - **`packages/server`** — the only place an `OPENAI_API_KEY` belongs. `createPetGeniusApp(opts)` returns a Hono app with the two routes mounted. Routes take a `ServerContext` (constructed openai client + model names + flags) — no module-level singletons, so multiple factory invocations in the same process don't interfere.
-- **`apps/demo`** — reference consumer. Vite + Hono in dev (Vite on `:5173` proxies `/api/*` to Hono on `:3000`). In prod the Hono server also serves `dist/`. Loads `.env.local` from repo root.
+- **`apps/demo`** — reference web consumer. Vite + Hono in dev (Vite on `:5173` proxies `/api/*` to Hono on `:3000`). In prod the Hono server also serves `dist/`. Loads `.env.local` from repo root.
+- **`apps/desktop`** — Tauri 2 native wrapper. Reuses `@pet-genius/widget` against a transparent always-on-top window (`transparent: true` + `macOSPrivateApi: true` on macOS, `decorations: false`, `alwaysOnTop: true`, `shadow: false`). Talks to whatever LLM proxy is running on `http://localhost:3000` (typically `apps/demo`'s server). Builds via `tauri build` produce `.dmg` / `.app` / `.msi` / `.deb` / `.AppImage`.
 
 ---
 

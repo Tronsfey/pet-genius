@@ -8,8 +8,27 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "files": ["src"],
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "echo 'no shared tests yet' && exit 0",
+    "prepublishOnly": "pnpm build"
+  },
+  "publishConfig": {
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
+  },
   "dependencies": {
     "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5"
   }
 }
