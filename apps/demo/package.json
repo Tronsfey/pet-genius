@@ -1,0 +1,25 @@
+{
+  "name": "@pet-genius/demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n vite,api -c cyan,magenta \"vite\" \"tsx watch server.ts\"",
+    "build": "vite build",
+    "start": "node --import tsx --enable-source-maps server.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "echo 'no demo tests' && exit 0"
+  },
+  "dependencies": {
+    "@pet-genius/server": "workspace:*",
+    "@pet-genius/widget": "workspace:*",
+    "@hono/node-server": "^1.13.7",
+    "dotenv": "^16.4.7",
+    "hono": "^4.6.14",
+    "solid-js": "^1.9.3"
+  },
+  "devDependencies": {
+    "vite": "^6.0.5",
+    "vite-plugin-solid": "^2.11.0"
+  }
+}

@@ -7,31 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@hono/node-server':
-        specifier: ^1.13.7
-        version: 1.19.14(hono@4.12.18)
-      dotenv:
-        specifier: ^16.4.7
-        version: 16.6.1
-      hono:
-        specifier: ^4.6.14
-        version: 4.12.18
-      openai:
-        specifier: ^4.77.0
-        version: 4.104.0(zod@3.25.76)
-      pixi.js:
-        specifier: ^8.6.6
-        version: 8.18.1
-      sharp:
-        specifier: ^0.33.5
-        version: 0.33.5
-      solid-js:
-        specifier: ^1.9.3
-        version: 1.9.12
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.76
     devDependencies:
       '@biomejs/biome':
         specifier: ^1.9.4
@@ -48,9 +23,74 @@ importers:
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.17)
+
+  apps/demo:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^1.13.7
+        version: 1.19.14(hono@4.12.18)
+      '@pet-genius/server':
+        specifier: workspace:*
+        version: link:../../packages/server
+      '@pet-genius/widget':
+        specifier: workspace:*
+        version: link:../../packages/widget
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.6.1
+      hono:
+        specifier: ^4.6.14
+        version: 4.12.18
+      solid-js:
+        specifier: ^1.9.3
+        version: 1.9.12
+    devDependencies:
       vite:
         specifier: ^6.0.5
         version: 6.4.2(@types/node@22.19.17)(tsx@4.21.0)
+      vite-plugin-solid:
+        specifier: ^2.11.0
+        version: 2.11.12(solid-js@1.9.12)(vite@6.4.2(@types/node@22.19.17)(tsx@4.21.0))
+
+  packages/server:
+    dependencies:
+      '@pet-genius/shared':
+        specifier: workspace:*
+        version: link:../shared
+      hono:
+        specifier: ^4.6.14
+        version: 4.12.18
+      openai:
+        specifier: ^4.77.0
+        version: 4.104.0(zod@3.25.76)
+      sharp:
+        specifier: ^0.33.5
+        version: 0.33.5
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+
+  packages/shared:
+    dependencies:
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+
+  packages/widget:
+    dependencies:
+      '@pet-genius/shared':
+        specifier: workspace:*
+        version: link:../shared
+      pixi.js:
+        specifier: ^8.6.6
+        version: 8.18.1
+      solid-js:
+        specifier: ^1.9.3
+        version: 1.9.12
+    devDependencies:
       vite-plugin-solid:
         specifier: ^2.11.0
         version: 2.11.12(solid-js@1.9.12)(vite@6.4.2(@types/node@22.19.17)(tsx@4.21.0))

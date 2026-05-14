@@ -1,0 +1,108 @@
+/* Demo-only chrome. The pet widget brings its own styles via @pet-genius/widget/styles.css. */
+
+:root {
+  color-scheme: dark;
+  --demo-bg: #0f1117;
+  --demo-panel: #161922;
+  --demo-border: #262a36;
+  --demo-text: #e6e8ee;
+  --demo-muted: #8a90a0;
+  --demo-accent: #ffb46b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  background: var(--demo-bg);
+  color: var(--demo-text);
+}
+
+.demo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--demo-border);
+  background: var(--demo-panel);
+  position: relative;
+  z-index: 10;
+}
+
+.demo-header h1 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  color: var(--demo-accent);
+  font-family: "Courier New", ui-monospace, monospace;
+}
+
+.demo-header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.demo-ghost {
+  background: transparent;
+  color: var(--demo-muted);
+  border: 1px solid var(--demo-border);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.demo-ghost:hover {
+  color: var(--demo-text);
+}
+
+.demo-backdrop {
+  position: fixed;
+  inset: 49px 0 0 0;
+  background: radial-gradient(circle at 20% 30%, rgba(255, 180, 107, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(126, 209, 255, 0.06) 0%, transparent 50%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.014),
+      rgba(255, 255, 255, 0.014) 1px,
+      transparent 1px,
+      transparent 36px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.014),
+      rgba(255, 255, 255, 0.014) 1px,
+      transparent 1px,
+      transparent 36px
+    );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.demo-hint {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--demo-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.demo-mount {
+  position: fixed;
+  inset: 49px 0 0 0;
+  z-index: 2;
+}

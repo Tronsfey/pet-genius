@@ -2,7 +2,7 @@
 
 Guidance for AI assistants (and humans) working in this repository.
 
-> **Status: scaffolded, AI action loop pivot complete.** End-to-end runnable: customization form → `/api/sprite` (gpt-image-1, real or `USE_TEST_PET=1` stub) → PixiJS skeletal rig → autonomous + reactive `/api/action` calls (gpt-4o-mini) drive the pet's animations + optional floating thoughts. **Not a chat tool**: the model picks behavior, not dialogue. Production hosting and license are the only remaining product decisions.
+> **Status: monorepo SDK ready.** Three publishable packages — `@pet-genius/shared` (types + zod + style config + clips), `@pet-genius/server` (`createPetGeniusApp` Hono factory), `@pet-genius/widget` (`summonPet` browser SDK) — plus `apps/demo` as the reference consumer. End-to-end runnable: customization form → `/api/sprite` (gpt-image-1, real or `USE_TEST_PET=1` stub) → PixiJS skeletal rig on a transparent draggable widget → autonomous + reactive `/api/action` calls (gpt-4o-mini) drive the pet's animations + optional floating thoughts. **Not a chat tool**: the model picks behavior, not dialogue.
 
 ---
 
@@ -50,7 +50,7 @@ No application source yet — `CLAUDE.md`, `.gitignore`, `.env.example` only. De
 | Animation        | **Custom skeletal rig** on PixiJS Containers; JSON keyframes |
 | Persistence      | `PetStore` interface; first impl `LocalStoragePetStore` |
 | Schema versioning| `PetState.version: number` + sequential migration fns   |
-| Package layout   | Single `package.json` (client + server in one tree)     |
+| Package layout   | pnpm workspaces: 3 publishable packages + 1 demo app    |
 
 **Still open** (ask the user before guessing): production hosting for the Node server (Fly.io recommended; any VPS works), license. SAM-based segmentation is an upgrade path if the controlled-layout grid produces low-quality slices in practice.
 
@@ -63,63 +63,66 @@ pet-genius/
 └── CLAUDE.md           # this file
 ```
 
-Target shape once the scaffold lands (single package, no workspaces):
+pnpm workspace layout: three publishable packages + one consumer demo.
 
 ```
 pet-genius/
-├── src/                  # browser bundle (Vite entry)
-│   ├── lib/              # shared types & schemas (used by src/ and server/)
-│   │   ├── types.ts
-│   │   └── schemas.ts
-│   ├── pet/              # PetState identity + persistence
-│   │   ├── store.ts          # PetStore interface
-│   │   ├── local-store.ts    # LocalStoragePetStore impl
-│   │   └── migrations.ts     # version → version migration fns
-│   ├── ai/               # client-side
-│   │   └── client.ts         # chat() / generateSprite() POST to /api/*
-│   ├── render/           # PixiJS app + skeletal rig
-│   │   ├── app.ts            # PixiJS Application bootstrap; nearest scaling
-│   │   ├── rig.ts            # mountRig(), applyPose() over Containers
-│   │   ├── clip.ts           # sampleClipAt(clip, t): Pose
-│   │   └── easing.ts         # linear / easeInOut / easeOutBack
-│   ├── world/            # the only writer of PetState
-│   │   ├── fsm.ts            # MoodState transitions
-│   │   ├── tick.ts           # per-frame needs decay + FSM step
-│   │   ├── actions.ts        # dispatch(intent): feed / pet / ai-action / record-event
-│   │   └── ai-loop.ts        # jittered /api/action poll + post-user-action poke
-│   ├── ui/               # Solid components
-│   │   ├── App.tsx
-│   │   ├── CreatePet.tsx     # first-load trait form, calls /api/sprite, persists pet
-│   │   ├── PetCanvas.tsx     # mounts the PixiJS canvas
-│   │   ├── StatusBar.tsx     # tiny needs bars (hunger / energy / cleanliness / affection)
-│   │   └── ThoughtBubble.tsx # transient floating one-liner above the pet
-│   ├── main.tsx
-│   └── styles.css
-├── server/               # Hono on Node 20+ — the ONLY place secrets live
-│   ├── env.ts            # dotenv load + required-var checks
-│   ├── openai.ts         # singleton openai SDK client (uses OPENAI_BASE_URL)
-│   ├── prompts.ts        # systemPromptForAction(traits), spritePromptForGeneration(traits)
-│   ├── action.ts         # POST /api/action → openai.chat.completions (JSON mode)
-│   ├── sprite.ts         # POST /api/sprite → openai.images.generate
-│   ├── slice.ts          # sharp-based grid slicing
-│   └── index.ts          # entrypoint; serves /api/* + Vite dist/* in prod
-├── public/               # static-shipped assets (favicon, fallback test pet)
-├── tests/                # Vitest specs (migrations, fsm, slicing math)
-├── scripts/
-├── index.html
-├── package.json
-├── tsconfig.json
-├── tsconfig.server.json
-├── vite.config.ts
-└── biome.json
+├── packages/
+│   ├── shared/                       # @pet-genius/shared — zero deps except zod
+│   │   ├── src/
+│   │   │   ├── types.ts              # PetState, PetTraits, Rig, ActionRequest, …
+│   │   │   ├── schemas.ts            # zod mirrors of every type
+│   │   │   ├── style.ts              # ArtStyle + STYLES map (4 styles)
+│   │   │   ├── clips.ts              # defaultClips (8 named animations)
+│   │   │   └── index.ts
+│   │   └── package.json
+│   ├── server/                       # @pet-genius/server — Hono factory
+│   │   ├── src/
+│   │   │   ├── factory.ts            # createPetGeniusApp(opts) → Hono
+│   │   │   ├── context.ts            # ServerContext interface (passed to routes)
+│   │   │   ├── action.ts             # createActionApp(ctx): /api/action
+│   │   │   ├── sprite.ts             # createSpriteApp(ctx): /api/sprite (LRU-cached)
+│   │   │   ├── prompts.ts            # systemPromptForAction / userPromptForAction / spritePromptForGeneration
+│   │   │   ├── slice.ts              # sliceGridImage(buf, style) — sharp-based + proportional attach
+│   │   │   ├── test-pet.ts           # built-in SVG pixel fox for USE_TEST_PET=1
+│   │   │   └── index.ts
+│   │   └── package.json
+│   └── widget/                       # @pet-genius/widget — browser SDK
+│       ├── src/
+│       │   ├── summon.tsx            # summonPet(opts) → WidgetController (public facade)
+│       │   ├── controller.ts         # WidgetController class (imperative handle)
+│       │   ├── ai/client.ts          # ApiClient(apiBase): requestAction / generateSprite
+│       │   ├── pet/                  # PetStore interface + LocalStoragePetStore + migrations
+│       │   ├── render/               # PixiJS app + rig + clip + easing
+│       │   ├── world/                # FSM, tick, dispatch, ai-loop
+│       │   ├── ui/                   # Solid components (App / PetCanvas / CreatePet / …)
+│       │   ├── styles.css            # widget styles (consumer imports as @pet-genius/widget/styles.css)
+│       │   └── index.ts
+│       ├── tests/migrations.test.ts
+│       └── package.json
+├── apps/
+│   └── demo/                         # consumer of the published SDK
+│       ├── server.ts                 # demo Node server using createPetGeniusApp + dotenv
+│       ├── src/main.tsx              # consumer using summonPet
+│       ├── src/demo.css              # demo page chrome (header / backdrop only)
+│       ├── index.html
+│       ├── vite.config.ts
+│       └── package.json
+├── docs/INTEGRATION.md               # how-to for downstream consumers
+├── scripts/screenshot.mjs            # Playwright reference captures
+├── pnpm-workspace.yaml
+├── package.json                      # root scripts + dev deps only
+├── tsconfig.base.json                # shared strict-mode compiler options
+├── biome.json
+└── CLAUDE.md
 ```
 
-Per-directory notes:
+Per-package notes:
 
-- **`src/render/`** — set `TextureSource.defaultOptions.scaleMode = 'nearest'` once at boot. PixiJS Application is initialized with `backgroundAlpha: 0` so the canvas is transparent and the pet floats over whatever is behind it. Camera zoom is integer-only; do not CSS-scale the canvas. Hosts the custom skeletal rig (see §5).
-- **`src/ai/`** — exposes `chat()` and `generateSprite()` that POST to `/api/chat` and `/api/sprite`. **Never** imports an API key. AI replies are parsed with zod before they touch state.
-- **`src/pet/`** — call sites depend on the `PetStore` *interface*, not on `localStorage` directly. Migrations live here (one fn per version bump).
-- **`server/`** — the only place `OPENAI_API_KEY` and `OPENAI_BASE_URL` are read. Hono router. **Dev:** runs on `:3000`; Vite on `:5173` proxies `/api/*` to it. **Prod:** `pnpm build` produces `dist/`; Hono serves `dist/*` via `serveStatic` and `/api/*` from the same process.
+- **`packages/shared`** — depends only on `zod`. Imported by both widget and server so the wire format between them is defined exactly once. No DOM, no Node-specific APIs; safe to consume from anywhere.
+- **`packages/widget`** — public entry is `summonPet(opts)` returning a `WidgetController`. PixiJS is initialized with `backgroundAlpha: 0` (transparent canvas). `TextureSource.defaultOptions.scaleMode` and `image-rendering` are driven by the chosen `ArtStyle` (`nearest` + `pixelated` for `pixel`; `linear` + `auto` otherwise). The PixiJS Application + AI loop + Solid render are all disposed when `controller.destroy()` is called. **Never** imports an API key — calls go through `ApiClient(apiBase)`.
+- **`packages/server`** — the only place an `OPENAI_API_KEY` belongs. `createPetGeniusApp(opts)` returns a Hono app with the two routes mounted. Routes take a `ServerContext` (constructed openai client + model names + flags) — no module-level singletons, so multiple factory invocations in the same process don't interfere.
+- **`apps/demo`** — reference consumer. Vite + Hono in dev (Vite on `:5173` proxies `/api/*` to Hono on `:3000`). In prod the Hono server also serves `dist/`. Loads `.env.local` from repo root.
 
 ---
 
