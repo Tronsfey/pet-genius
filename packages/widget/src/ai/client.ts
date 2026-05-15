@@ -31,7 +31,17 @@ function trimTrailingSlash(s: string): string {
   return s.endsWith('/') ? s.slice(0, -1) : s;
 }
 
-export class ApiClient {
+/**
+ * Minimal contract the widget needs from an API transport. `ApiClient` is the
+ * default HTTP implementation; consumers can inject a mock (e.g. a keyless
+ * static demo) by supplying anything that satisfies this shape.
+ */
+export interface ApiClientLike {
+  requestAction(req: ActionRequest): Promise<ActionResponse>;
+  generateSprite(traits: PetTraits): Promise<SpriteResponse>;
+}
+
+export class ApiClient implements ApiClientLike {
   private readonly base: string;
 
   constructor(apiBase: string) {

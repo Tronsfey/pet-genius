@@ -2,7 +2,14 @@
 
 > A personalized, AI-driven pet-spirit that lives wherever you put it — a draggable floating widget on any web page, or a transparent always-on-top window on your desktop. **Not a chat tool**: the model decides what the pet *does*, not what it *says*.
 
-![pet on hover](./scripts/screenshots/03-hovered.png)
+### ▶ [Live demo →](https://tronsfey.github.io/pet-genius/)
+
+A keyless, server-less build of the web widget. You can customize a pet, drag it
+around, hover for the status panel, and watch it animate. The behavior in the
+hosted demo is **canned** (no LLM / API key) — point the SDK at a real
+[`@pet-genius/server`](./packages/server) for live AI-driven behavior.
+
+![pet on hover](./scripts/screenshots/web-demo.png)
 
 ## What you get
 

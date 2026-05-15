@@ -4,6 +4,7 @@ export { summonPet, type SummonPetOptions } from './summon';
 export { WidgetController } from './controller';
 export { LocalStoragePetStore } from './pet/local-store';
 export type { PetStore } from './pet/store';
+export { ApiClient, type ApiClientLike } from './ai/client';
 
 // Re-export shared types so consumers don't need a separate import.
 export type {

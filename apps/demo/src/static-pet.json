@@ -1,0 +1,169 @@
+{
+  "sprites": {
+    "torso": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAcCAYAAAATFf3WAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAe0lEQVR4nO3XsQ3AIAwEQE+XKagzBCN4kgyROlNkgB+AMpLTI4GVBoPyL31HcfrKiKwWaLLIige79i20aEGjl0NvyWgMPGQ0BATqhMBy5E8lEA3gc5/dEggCE4FGIAjMBBqB+tdjoYwAzni0Sp36QdR3Ey2gBx6+mCySF6+z3DvtNbBVAAAAAElFTkSuQmCC",
+    "head": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAaCAYAAACkVDyJAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAqklEQVR4nGNggIIXXTH/kTEDheAFIfNAgsfS3MCYWhYew2fegFj4Agl/WVFFEX6BL0gpNZxYzDAgFn6hIJjICX4Gevnuy6iFX+ht4Z8f7zAwNdQyEDJERkyOaAuJUUuUhTCDqKGWYdBY+GWwpNI/d/agYIot/NA3D45xWQgPOhwWfsBjBlkWEvLhB1IspHuQfsGDYUGJi0+TREOuRV9gFg7/Gh8d0MUSegIA9Vdo3lRA2+YAAAAASUVORK5CYII=",
+    "armL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAQCAYAAAAvf+5AAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAO0lEQVR4nGNgYGBgOJbm9h8fZoCBF10x//FhBmIUvYApHlX4gr4KGYiNQhsNo//EYBSFf368w0qTpBAAR2yVuvelJNEAAAAASUVORK5CYII=",
+    "armR": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAQCAYAAAAvf+5AAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAO0lEQVR4nGNgYGBgOJbm9h8fZoCBF10x//FhBmIUvYApHlX4gr4KGYiNQhsNo//EYBSFf368w0qTpBAAR2yVuvelJNEAAAAASUVORK5CYII=",
+    "legL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAMCAYAAABbayygAAAACXBIWXMAAAsTAAALEwEAmpwYAAAANElEQVR4nGNgYGBgOJbm9h8fZoABohQeI6DoGEzxsFIIAkQpstEw+k8Mhiv88+MdXppohQARGA76hmFUbwAAAABJRU5ErkJggg==",
+    "legR": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAMCAYAAABbayygAAAACXBIWXMAAAsTAAALEwEAmpwYAAAANElEQVR4nGNgYGBgOJbm9h8fZoABohQeI6DoGEzxsFIIAkQpstEw+k8Mhiv88+MdXppohQARGA76hmFUbwAAAABJRU5ErkJggg==",
+    "tail": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAKCAYAAAC9vt6cAAAACXBIWXMAAAsTAAALEwEAmpwYAAAANUlEQVR4nGNgIAH8+fHuPzJmoETzH1IN+UPIgGNpbv/xYZwGHCOgcSQYgA5wGQCTJysN4AMAy/M+FldkBmcAAAAASUVORK5CYII="
+  },
+  "rig": {
+    "bones": [
+      {
+        "name": "torso",
+        "parent": null,
+        "pivot": { "x": 20, "y": 14 },
+        "attach": { "x": 0, "y": 0 },
+        "spriteId": "torso",
+        "z": 1
+      },
+      {
+        "name": "head",
+        "parent": "torso",
+        "pivot": { "x": 14, "y": 22 },
+        "attach": { "x": 0, "y": -10 },
+        "spriteId": "head",
+        "z": 3
+      },
+      {
+        "name": "armL",
+        "parent": "torso",
+        "pivot": { "x": 5, "y": 2 },
+        "attach": { "x": -16, "y": -4 },
+        "spriteId": "armL",
+        "z": 2
+      },
+      {
+        "name": "armR",
+        "parent": "torso",
+        "pivot": { "x": 5, "y": 2 },
+        "attach": { "x": 16, "y": -4 },
+        "spriteId": "armR",
+        "z": 2
+      },
+      {
+        "name": "legL",
+        "parent": "torso",
+        "pivot": { "x": 5, "y": 0 },
+        "attach": { "x": -8, "y": 12 },
+        "spriteId": "legL",
+        "z": 0
+      },
+      {
+        "name": "legR",
+        "parent": "torso",
+        "pivot": { "x": 5, "y": 0 },
+        "attach": { "x": 8, "y": 12 },
+        "spriteId": "legR",
+        "z": 0
+      },
+      {
+        "name": "tail",
+        "parent": "torso",
+        "pivot": { "x": 0, "y": 5 },
+        "attach": { "x": -22, "y": 4 },
+        "spriteId": "tail",
+        "z": 0
+      }
+    ],
+    "clips": [
+      {
+        "name": "idle",
+        "duration": 2.4,
+        "loops": true,
+        "keyframes": [
+          { "t": 0, "pose": { "torso": { "y": 0 } }, "ease": "easeInOut" },
+          {
+            "t": 0.5,
+            "pose": { "torso": { "y": -1.5 }, "tail": { "rot": 0.15 } },
+            "ease": "easeInOut"
+          },
+          { "t": 1, "pose": { "torso": { "y": 0 } } }
+        ]
+      },
+      {
+        "name": "happy_bounce",
+        "duration": 0.7,
+        "loops": false,
+        "keyframes": [
+          { "t": 0, "pose": {} },
+          {
+            "t": 0.35,
+            "pose": {
+              "torso": { "y": -10 },
+              "head": { "rot": 0.12 },
+              "armL": { "rot": -0.3 },
+              "armR": { "rot": 0.3 },
+              "tail": { "rot": 0.4 }
+            },
+            "ease": "easeOutBack"
+          },
+          { "t": 1, "pose": {} }
+        ]
+      },
+      {
+        "name": "eating",
+        "duration": 0.6,
+        "loops": true,
+        "keyframes": [
+          { "t": 0, "pose": { "head": { "rot": 0 } } },
+          { "t": 0.5, "pose": { "head": { "rot": 0.2 } }, "ease": "easeInOut" },
+          { "t": 1, "pose": { "head": { "rot": 0 } }, "ease": "easeInOut" }
+        ]
+      },
+      {
+        "name": "sleeping",
+        "duration": 3,
+        "loops": true,
+        "keyframes": [
+          { "t": 0, "pose": { "head": { "rot": 0.35, "y": 4 } } },
+          { "t": 0.5, "pose": { "head": { "rot": 0.4, "y": 6 } }, "ease": "easeInOut" },
+          { "t": 1, "pose": { "head": { "rot": 0.35, "y": 4 } } }
+        ]
+      },
+      {
+        "name": "playing",
+        "duration": 0.8,
+        "loops": true,
+        "keyframes": [
+          { "t": 0, "pose": {} },
+          {
+            "t": 0.5,
+            "pose": { "torso": { "rot": 0.12 }, "tail": { "rot": -0.4 } },
+            "ease": "easeInOut"
+          },
+          { "t": 1, "pose": {} }
+        ]
+      },
+      {
+        "name": "sad",
+        "duration": 1.2,
+        "loops": true,
+        "keyframes": [
+          { "t": 0, "pose": { "head": { "y": 3, "rot": -0.1 }, "tail": { "rot": -0.3 } } },
+          { "t": 1, "pose": { "head": { "y": 4, "rot": -0.1 }, "tail": { "rot": -0.3 } } }
+        ]
+      },
+      {
+        "name": "wake",
+        "duration": 0.5,
+        "loops": false,
+        "keyframes": [
+          { "t": 0, "pose": { "head": { "rot": 0.35, "y": 4 } } },
+          { "t": 1, "pose": {}, "ease": "easeOutBack" }
+        ]
+      },
+      {
+        "name": "stretch",
+        "duration": 0.9,
+        "loops": false,
+        "keyframes": [
+          { "t": 0, "pose": {} },
+          { "t": 0.5, "pose": { "torso": { "scale": 1.08 } }, "ease": "easeInOut" },
+          { "t": 1, "pose": {} }
+        ]
+      }
+    ]
+  }
+}

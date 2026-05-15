@@ -1,6 +1,6 @@
 import type { PetState } from '@pet-genius/shared';
 import { Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js';
-import type { ApiClient } from '../ai/client';
+import type { ApiClientLike } from '../ai/client';
 import type { WidgetController } from '../controller';
 import type { PetStore } from '../pet/store';
 import { dispatch } from '../world/actions';
@@ -12,7 +12,7 @@ import StatusBar from './StatusBar';
 import ThoughtBubble from './ThoughtBubble';
 
 export interface WidgetConfig {
-  client: ApiClient;
+  client: ApiClientLike;
   store: PetStore;
   petId: string;
   posStorageKey: string;

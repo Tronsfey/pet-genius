@@ -1,5 +1,5 @@
 import type { ActionRequest, PetState } from '@pet-genius/shared';
-import type { ApiClient } from '../ai/client';
+import type { ApiClientLike } from '../ai/client';
 import { dispatch } from './actions';
 import type { FsmState } from './fsm';
 
@@ -13,7 +13,7 @@ export interface AiLoopHandle {
 }
 
 export interface AiLoopOptions {
-  client: ApiClient;
+  client: ApiClientLike;
   state: PetState;
   fsm: FsmState;
   onThought: (text: string) => void;

@@ -30,8 +30,10 @@ The first call shows a creation form (`name / palette / vibe / species hint / ar
 interface SummonPetOptions {
   /** A DOM element to mount into. Should be sized large enough for the widget. */
   host: HTMLElement;
-  /** Base URL of your pet-genius server (no trailing slash). */
-  apiBase: string;
+  /** Base URL of your pet-genius server (no trailing slash). Required unless `apiClient` is given. */
+  apiBase?: string;
+  /** Inject a custom transport (mock / offline / instrumented). Overrides apiBase. */
+  apiClient?: ApiClientLike;
   /** Logical ID for the saved pet. Default: `'default'`. */
   petId?: string;
   /** Persistence backend. Default: `new LocalStoragePetStore()`. */
@@ -39,6 +41,24 @@ interface SummonPetOptions {
   /** Starting position (overrides any saved position). */
   defaultPosition?: { x: number; y: number };
 }
+```
+
+### Keyless / offline mode
+
+Supply an `apiClient` implementing `ApiClientLike` (`requestAction` +
+`generateSprite`) to run without a server — useful for demos, tests, or
+Storybook. This is exactly how the [live demo](https://tronsfey.github.io/pet-genius/)
+runs with zero API key:
+
+```ts
+import { summonPet, type ApiClientLike } from '@pet-genius/widget';
+
+class MockClient implements ApiClientLike {
+  async generateSprite(traits) { return { sprites, rig, traits }; }
+  async requestAction(_req) { return { animation: 'idle', intensity: 0.5 }; }
+}
+
+summonPet({ host, apiClient: new MockClient() });
 ```
 
 The host should usually fill the area you want the pet to be able to roam in. For a full-page floating pet:

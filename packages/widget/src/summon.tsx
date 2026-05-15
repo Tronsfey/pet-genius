@@ -1,5 +1,5 @@
 import { render } from 'solid-js/web';
-import { ApiClient } from './ai/client';
+import { ApiClient, type ApiClientLike } from './ai/client';
 import { WidgetController } from './controller';
 import { LocalStoragePetStore } from './pet/local-store';
 import type { PetStore } from './pet/store';
@@ -8,8 +8,16 @@ import App from './ui/App';
 export interface SummonPetOptions {
   /** A DOM element to mount into. Should be sized large enough to hold the widget (default: viewport). */
   host: HTMLElement;
-  /** Base URL for the pet-genius server (without trailing slash). e.g. `https://my-pet.fly.dev`. */
-  apiBase: string;
+  /**
+   * Base URL for the pet-genius server (without trailing slash).
+   * Required unless `apiClient` is supplied.
+   */
+  apiBase?: string;
+  /**
+   * Inject a custom API transport (mock, instrumented, offline). Overrides
+   * `apiBase`. Anything matching `ApiClientLike` works.
+   */
+  apiClient?: ApiClientLike;
   /** Logical ID for the saved pet within the store. Default: `'default'`. */
   petId?: string;
   /** Persistence backend. Default: `new LocalStoragePetStore()`. */
@@ -33,12 +41,12 @@ export function summonPet(opts: SummonPetOptions): WidgetController {
   if (!opts.host) {
     throw new Error('summonPet: host element is required');
   }
-  if (!opts.apiBase) {
-    throw new Error('summonPet: apiBase is required');
+  if (!opts.apiClient && !opts.apiBase) {
+    throw new Error('summonPet: either apiBase or apiClient is required');
   }
 
   const controller = new WidgetController();
-  const client = new ApiClient(opts.apiBase);
+  const client: ApiClientLike = opts.apiClient ?? new ApiClient(opts.apiBase as string);
   const store = opts.store ?? new LocalStoragePetStore();
   const petId = opts.petId ?? 'default';
   const posStorageKey = `pet-genius:widget-pos:${petId}`;

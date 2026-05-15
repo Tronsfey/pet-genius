@@ -53,6 +53,16 @@ body {
   gap: 10px;
 }
 
+.demo-badge {
+  font-size: 11px;
+  color: var(--demo-accent);
+  border: 1px solid var(--demo-accent);
+  padding: 3px 9px;
+  border-radius: 999px;
+  opacity: 0.75;
+  align-self: center;
+}
+
 .demo-ghost {
   background: transparent;
   color: var(--demo-muted);

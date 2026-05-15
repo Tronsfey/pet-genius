@@ -1,9 +1,9 @@
 import { type ArtStyle, type PetState, type PetTraits, STYLES } from '@pet-genius/shared';
 import { For, createSignal } from 'solid-js';
-import type { ApiClient } from '../ai/client';
+import type { ApiClientLike } from '../ai/client';
 
 interface Props {
-  client: ApiClient;
+  client: ApiClientLike;
   onCreated: (pet: PetState) => void;
 }
 
