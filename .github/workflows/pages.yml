@@ -45,7 +45,12 @@ jobs:
           VITE_PET_MODE: static
         run: pnpm --filter @pet-genius/demo exec vite build
 
+      # `enablement: true` turns GitHub Pages on via the API on first run, so
+      # no manual Settings → Pages toggle is needed (requires Actions to have
+      # write access to Pages, which `permissions.pages: write` above grants).
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
