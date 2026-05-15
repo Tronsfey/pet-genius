@@ -2,21 +2,23 @@
 
 > A personalized, AI-driven pet-spirit that lives wherever you put it — a draggable floating widget on any web page, or a transparent always-on-top window on your desktop. **Not a chat tool**: the model decides what the pet *does*, not what it *says*.
 
-### ▶ [Live demo →](https://tronsfey.github.io/pet-genius/) <sub>(goes live after the first green [Pages workflow](./.github/workflows/pages.yml) run)</sub>
+### ▶ Live demo
 
-A keyless, server-less build of the web widget. You can customize a pet, drag it
-around, hover for the status panel, and watch it animate. The behavior in the
-hosted demo is **canned** (no LLM / API key) — point the SDK at a real
-[`@pet-genius/server`](./packages/server) for live AI-driven behavior.
+A keyless, server-less build of the web widget — customize a pet, drag it
+around, hover for the status panel, watch it animate. Behavior is **canned**
+(no LLM / API key); point the SDK at a real [`@pet-genius/server`](./packages/server)
+for live AI-driven behavior.
 
-> **Demo 404s?** GitHub Pages publishes on the first successful run of the
-> `Deploy web demo to GitHub Pages` workflow. The workflow self-enables Pages
-> (`actions/configure-pages` with `enablement: true`). If it still 404s:
-> 1. Repo **Settings → Actions → General** — ensure Actions are *Allowed*.
-> 2. Repo **Actions** tab — open the workflow and **Run workflow** manually
->    (or push any change under `packages/` or `apps/demo/`).
-> 3. Repo **Settings → Pages** — Source should read *GitHub Actions*.
-> Until then you can run it locally: `pnpm --filter @pet-genius/demo dev`.
+- **Instant link (needs only a *public* repo — no Pages, no Actions, no settings):**
+  [raw.githack.com/tronsfey/pet-genius/…/docs/demo/index.html](https://raw.githack.com/tronsfey/pet-genius/claude/add-claude-documentation-KfExb/docs/demo/index.html)
+  — serves the pre-built bundle in [`docs/demo/`](./docs/demo) straight from the repo.
+- **Nicer URL (after the [Pages workflow](./.github/workflows/pages.yml) goes green):**
+  [tronsfey.github.io/pet-genius](https://tronsfey.github.io/pet-genius/)
+
+> Both require the repo to be **public** (GitHub Pages also needs Actions
+> enabled; the githack link does not). If a link 404s, the repo is almost
+> certainly still private — that's the one thing no code change can fix.
+> Locally it always works: `pnpm --filter @pet-genius/demo dev`.
 
 ![pet on hover](./scripts/screenshots/web-demo.png)
 
