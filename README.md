@@ -9,16 +9,16 @@ around, hover for the status panel, watch it animate. Behavior is **canned**
 (no LLM / API key); point the SDK at a real [`@pet-genius/server`](./packages/server)
 for live AI-driven behavior.
 
-- **Instant link** (pre-built bundle in [`docs/demo/`](./docs/demo), served
-  straight from the public repo — no Pages, no Actions, no settings):
-  [▶ open the demo](https://raw.githack.com/tronsfey/pet-genius/c4e217309ac2b5813a9b83bd4ac8413408318223/docs/demo/index.html)
-  <sub>(SHA-pinned: the working branch name contains a `/`, which breaks
-  githack's path parser, so the link points at a commit)</sub>
-- **Stable URL** (once the [Pages workflow](./.github/workflows/pages.yml) is
-  green — slash-free, auto-updates): [tronsfey.github.io/pet-genius](https://tronsfey.github.io/pet-genius/)
+- **Instant, stable link** — served from the slash-free `gh-pages` branch
+  (built bundle only), no Pages/Actions/settings needed:
+  [▶ open the demo](https://raw.githack.com/tronsfey/pet-genius/gh-pages/index.html)
+- **Project-site URL** — enable repo **Settings → Pages → Deploy from a
+  branch → `gh-pages` / (root)**, then:
+  [tronsfey.github.io/pet-genius](https://tronsfey.github.io/pet-genius/)
 
-> Both need the repo **public** (Pages also needs Actions enabled; the githack
-> link does not). Locally it always works: `pnpm --filter @pet-genius/demo dev`.
+> Both need the repo **public** (already is). The githack link works the
+> moment `gh-pages` is pushed — no further setup. Locally it always works:
+> `pnpm --filter @pet-genius/demo dev`.
 
 ![pet on hover](./scripts/screenshots/web-demo.png)
 

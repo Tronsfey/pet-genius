@@ -1,4 +1,4 @@
-name: Deploy web demo to GitHub Pages
+name: Deploy web demo to gh-pages
 
 on:
   push:
@@ -8,17 +8,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# Allow only one concurrent deployment.
 concurrency:
-  group: pages
+  group: gh-pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,28 +33,19 @@ jobs:
 
       - name: Build keyless static demo
         env:
-          # project-pages subpath + mock (no server, no API key)
-          PET_BASE: /pet-genius/
+          PET_BASE: './'
           VITE_PET_MODE: static
         run: pnpm --filter @pet-genius/demo exec vite build
 
-      # `enablement: true` turns GitHub Pages on via the API on first run, so
-      # no manual Settings → Pages toggle is needed (requires Actions to have
-      # write access to Pages, which `permissions.pages: write` above grants).
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: apps/demo/dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish to gh-pages
+        run: |
+          set -e
+          cd apps/demo/dist
+          rm -rf **/*.map || true
+          touch .nojekyll
+          git init -q
+          git config user.email "actions@github.com"
+          git config user.name "github-actions"
+          git add -A
+          git commit -qm "demo build ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:gh-pages
