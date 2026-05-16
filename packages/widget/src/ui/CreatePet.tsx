@@ -38,6 +38,16 @@ const PRESETS: { label: string; traits: PetTraits }[] = [
       style: 'watercolor',
     },
   },
+  {
+    label: 'ikun',
+    traits: {
+      name: '坤坤',
+      palette: 'black-and-white sporty jersey with orange basketball accents',
+      vibe: 'energetic showoff who loves to sing, dance, rap and play basketball',
+      speciesHint: 'small chick idol holding a basketball',
+      style: 'pixel',
+    },
+  },
 ];
 
 const STYLE_ORDER: ArtStyle[] = ['pixel', 'flat', 'watercolor', 'storybook'];
